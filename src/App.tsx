@@ -106,9 +106,23 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         setAuthLoading(false);
         return;
       }
-      sb.auth.getSession().then(({ data: { session } }) => {
+      sb.auth.getSession().then(async ({ data: { session } }) => {
         setUser(session?.user ?? null);
         setAuthLoading(false);
+        if (session?.user && 'serviceWorker' in navigator && 'PushManager' in window) {
+          try {
+            let permGranted = Notification.permission === 'granted';
+            if (!permGranted && Notification.permission === 'default') {
+              permGranted = (await Notification.requestPermission()) === 'granted';
+            }
+            if (permGranted) {
+              const { subscribeToPush } = await import('./lib/pushNotifications');
+              await subscribeToPush();
+            }
+          } catch (e) {
+            console.warn('Push registration failed', e);
+          }
+        }
       }).catch(err => {
         console.warn("Failed to get Supabase session.", err);
         setUser(null);
@@ -122,6 +136,24 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       };
     });
   }, []);
+
+  const handleSignOut = async () => {
+    const timeout = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+    try {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const { unsubscribeFromPush } = await import('./lib/pushNotifications');
+        await Promise.race([unsubscribeFromPush(), timeout(3000)]);
+      }
+    } catch (e) {
+      console.warn('Push unsubscribe failed during sign-out', e);
+    }
+    const { getSupabase } = await import('./lib/supabase');
+    const sb = getSupabase();
+    if (sb) {
+      await sb.auth.signOut();
+    }
+    setUser(null);
+  };
 
   useEffect(() => {
     (async () => {
@@ -669,7 +701,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         </header>
         
         <div className="flex flex-1 overflow-hidden relative">
-          <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} />
+          <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} onSignOut={handleSignOut} />
           
           <main className="flex-1 flex flex-col relative bg-[#fcffe4] p-2 overflow-hidden">
              {authLoading ? (

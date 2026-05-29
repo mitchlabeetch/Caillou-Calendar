@@ -7,10 +7,12 @@ import { CalendarEvent, FamilyMember } from '../types';
 import { useEvents } from '../lib/eventsContext';
 import { X, Clock, Repeat, BellRing, CheckSquare, GripVertical, Gift } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
   const { t } = useTranslation();
   const { events, setEvents, moveEvent, selectedMembers, familyMembers, settings, triggerDropAnimation } = useEvents();
+  const isMobile = useIsMobile();
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -140,7 +142,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
               <div className="flex flex-col gap-2 mt-1 overflow-visible">
                 {dayEvents.map(event => (
                   <React.Fragment key={event.id}>
-                    <EventPill event={event} dayStr={format(day, 'yyyy-MM-dd')} />
+                    <EventPill event={event} dayStr={format(day, 'yyyy-MM-dd')} isMobile={isMobile} />
                   </React.Fragment>
                 ))}
               </div>
@@ -197,7 +199,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
   );
 }
 
-function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string }) {
+function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?: string, isMobile: boolean }) {
   const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId, userRole } = useEvents();
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean) as FamilyMember[];
 
@@ -288,7 +290,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
             event.recurrence && event.recurrence.type !== 'none' && <Repeat className="w-2.5 h-2.5 opacity-50 ml-auto" />
           )}
         </div>
-        <EventHoverCard event={event} />
+        {!isMobile && <EventHoverCard event={event} />}
       </motion.div>
     );
   }
@@ -359,7 +361,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
         </button>
       )}
       
-      <EventHoverCard event={event} />
+      {!isMobile && <EventHoverCard event={event} />}
     </motion.div>
   );
 }
