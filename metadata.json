@@ -1,0 +1,8 @@
+{
+  "name": "Caillou-v0.6",
+  "description": "Caillou",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+  </head>
+  <body>
+    <div id="error-boundaries" style="color:white;z-index:999999;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(200,0,0,0.9);padding:20px;display:none;overflow-y:auto;font-family:monospace;font-size:16px;"></div>
+    <script>
+      window.addEventListener('error', function(e) {
+        var el = document.getElementById('error-boundaries');
+        el.style.display = 'block';
+        el.innerHTML += '<b>Global Error:</b> ' + e.message + '<br><b>Filename:</b> ' + e.filename + ':' + e.lineno + '<br><b>Stack:</b><br>' + (e.error && e.error.stack ? e.error.stack : 'N/A') + '<hr>';
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var el = document.getElementById('error-boundaries');
+        el.style.display = 'block';
+        el.innerHTML += '<b>Unhandled Promise Rejection:</b><br>' + (e.reason && e.reason.stack ? e.reason.stack : e.reason) + '<hr>';
+      });
+      
+      const originalConsoleError = console.error;
+      console.error = function(...args) {
+        var el = document.getElementById('error-boundaries');
+        el.style.display = 'block';
+        let str = '';
+        try { str = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '); } catch(err) { str = String(args); }
+        if (str.includes("Warning:") || str.includes("The above error occurred") || str.includes("React DevTools")) {
+           originalConsoleError.apply(console, args);
+           return;
+        }
+        el.innerHTML += '<b>Console Error:</b><br>' + str + '<hr>';
+        originalConsoleError.apply(console, args);
+      }
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
