@@ -138,10 +138,11 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   }, []);
 
   const handleSignOut = async () => {
+    const timeout = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
     try {
       if ('serviceWorker' in navigator && 'PushManager' in window) {
         const { unsubscribeFromPush } = await import('./lib/pushNotifications');
-        await unsubscribeFromPush();
+        await Promise.race([unsubscribeFromPush(), timeout(3000)]);
       }
     } catch (e) {
       console.warn('Push unsubscribe failed during sign-out', e);
