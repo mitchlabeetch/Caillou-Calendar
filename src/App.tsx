@@ -111,16 +111,13 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         setAuthLoading(false);
         if (session?.user && 'serviceWorker' in navigator && 'PushManager' in window) {
           try {
-            const perm = Notification.permission;
-            if (perm === 'granted') {
+            let permGranted = Notification.permission === 'granted';
+            if (!permGranted && Notification.permission === 'default') {
+              permGranted = (await Notification.requestPermission()) === 'granted';
+            }
+            if (permGranted) {
               const { subscribeToPush } = await import('./lib/pushNotifications');
               await subscribeToPush();
-            } else if (perm === 'default') {
-              const result = await Notification.requestPermission();
-              if (result === 'granted') {
-                const { subscribeToPush } = await import('./lib/pushNotifications');
-                await subscribeToPush();
-              }
             }
           } catch (e) {
             console.warn('Push registration failed', e);
