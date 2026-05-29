@@ -30,6 +30,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
     return events.filter(e => {
       if (!e || !e.date || !isValid(parseISO(e.date))) return false;
       if (!e.memberIds || !Array.isArray(e.memberIds) || !e.memberIds.some(id => selectedMembers.includes(id))) return false;
+      if (e.exceptionDates?.includes(dayStr)) return false;
       
       const eDate = parseISO(e.date);
       
@@ -197,7 +198,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
 }
 
 function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string }) {
-  const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId } = useEvents();
+  const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId, userRole } = useEvents();
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean) as FamilyMember[];
 
   const isSelected = selectedEventIdsForDelete.includes(event.id);
@@ -236,7 +237,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
           scale: { duration: 0.4, ease: "easeInOut" },
           layout: { type: "spring", stiffness: 350, damping: 25 }
         }}
-        draggable={!isMultiSelectMode}
+        draggable={!isMultiSelectMode && userRole !== 'child'}
         onDragStart={(e: any) => handleDragStart(e)}
         onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; }}
         onDrop={(e: any) => {
@@ -262,7 +263,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
           event.recurrence && event.recurrence.type !== 'none' ? "border-dashed" : "border-solid"
         )}
       >
-        {!isMultiSelectMode && (
+        {!isMultiSelectMode && userRole !== 'child' && (
           <button 
             onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }}
             className="absolute -top-2 -right-2 w-6 h-6 bg-red-400 text-white rounded-full border-[2px] border-ink opacity-0 group-hover:opacity-100 flex items-center justify-center z-20 hover:scale-110 transition-all shadow-neo"
@@ -305,7 +306,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
         scale: { duration: 0.4, ease: "easeInOut" },
         layout: { type: "spring", stiffness: 350, damping: 25 }
       }}
-      draggable={!isMultiSelectMode}
+      draggable={!isMultiSelectMode && userRole !== 'child'}
       onDragStart={(e: any) => handleDragStart(e)}
       onDragOver={(e: any) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; }}
       onDrop={(e: any) => {
@@ -349,7 +350,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
         )}
       </div>
       
-      {!isMultiSelectMode && (
+      {!isMultiSelectMode && userRole !== 'child' && (
         <button 
           onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }}
           className="absolute -top-1 -right-1 w-6 h-6 bg-red-400 text-white rounded-full border-[2px] border-ink opacity-0 group-hover:opacity-100 flex items-center justify-center z-20 hover:scale-110 transition-all shadow-neo"

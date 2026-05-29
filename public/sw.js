@@ -18,3 +18,15 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+self.addEventListener('push', (event) => {
+  const payload = event.data ? event.data.json() : { title: 'Family Sync', body: 'Schedule Updated!' };
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      vibrate: [200, 100, 200]
+    })
+  );
+});

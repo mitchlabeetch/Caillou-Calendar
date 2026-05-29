@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cn } from '../lib/utils';
-import { X, ImagePlus, MapPin, Clock } from 'lucide-react';
+import { cn, getConflictsForEvent } from '../lib/utils';
+import { X, ImagePlus, MapPin, Clock, AlertTriangle, Car } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useEvents } from '../lib/eventsContext';
 import { CalendarEvent, Recurrence, Reminder } from '../types';
+import * as chrono from 'chrono-node';
 
 export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
   const { t } = useTranslation();
@@ -19,6 +20,42 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
   const [isBirthday, setIsBirthday] = useState(false);
   
   const { setEvents, showToast, events, familyMembers } = useEvents();
+  const [driverId, setDriverId] = useState<string>('');
+
+  useEffect(() => {
+    if (title.length > 3) {
+      const parsed = chrono.parse(title);
+      if (parsed.length > 0) {
+        const start = parsed[0].start;
+        if (start && start.date()) {
+          const d = start.date();
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          if (!date) setDate(`${yyyy}-${mm}-${dd}`);
+          const hour = String(d.getHours()).padStart(2, '0');
+          const min = String(d.getMinutes()).padStart(2, '0');
+          if (!time && (d.getHours() !== 0 || d.getMinutes() !== 0)) {
+            setTime(`${hour}:${min}`);
+          }
+        }
+      }
+    }
+  }, [title]);
+
+  const draftEvent: CalendarEvent = {
+    id: 'draft',
+    title,
+    date,
+    endDate: endDate || undefined,
+    startTime: time || undefined,
+    location: location || undefined,
+    memberIds: selectedMems,
+    recurrence: { type: isBirthday ? 'yearly' : recurrence },
+    reminders,
+    isBirthday,
+  };
+  const conflicts = (date && selectedMems.length > 0) ? getConflictsForEvent(draftEvent, events) : [];
   
   const uniqueLocations = Array.from(new Set(events.filter(e => e.location).map(e => e.location as string))).slice(0, 5);
 
@@ -100,9 +137,10 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
               recurrence: { type: isBirthday ? 'yearly' : recurrence },
               reminders,
               isBirthday,
+              ...(driverId ? { driverId } : {}),
             };
             
-            import('../lib/eventsService').then(s => s.addEventToFirestore(newEvent));
+            import('../lib/syncEngine').then(s => s.syncInsert('events', newEvent));
             setEvents(prev => [...prev, newEvent]);
             
             if (reminders.length > 0) {
@@ -301,6 +339,39 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                 })}
               </div>
             </motion.div>
+
+            <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
+              <label className="text-xs font-black uppercase tracking-widest text-ink/60 flex items-center gap-1"><Car className="w-3 h-3"/> {t('app.driver', 'Driver')}</label>
+              <div className="flex flex-wrap gap-2">
+                {familyMembers.map(mem => {
+                  const isSel = driverId === mem.id;
+                  return (
+                    <button
+                      type="button"
+                      key={mem.id}
+                      onClick={() => setDriverId(isSel ? '' : mem.id)}
+                      className={cn(
+                        "px-3 h-8 rounded-full border-[2px] border-ink transition-all flex items-center justify-center font-bold text-xs uppercase",
+                        isSel ? mem.bgClass : "bg-bg-light text-ink/30 hover:bg-gray-200"
+                      )}
+                      title={mem.name}
+                    >
+                      {mem.name[0]}
+                    </button>
+                  )
+                })}
+              </div>
+            </motion.div>
+
+            {conflicts.length > 0 && (
+              <motion.div variants={itemVariants} className="flex items-center gap-2 p-3 bg-[#FF5722]/10 border-[2px] border-[#FF5722] rounded-xl">
+                <AlertTriangle className="w-5 h-5 text-[#FF5722] shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-bold text-xs text-[#FF5722]">{t('app.schedulingConflict', 'Scheduling Conflict')}</span>
+                  <span className="text-[10px] font-bold text-ink/60">{conflicts.map(c => c.title).join(', ')}</span>
+                </div>
+              </motion.div>
+            )}
 
             <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
                <label className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.memoryPhoto')}</label>

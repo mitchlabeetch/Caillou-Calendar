@@ -34,6 +34,8 @@ export type CalendarEvent = {
   recurrence?: Recurrence;
   reminders?: Reminder[];
   isBirthday?: boolean;
+  driverId?: string;
+  exceptionDates?: string[]; // Dates to skip in a recurring pattern
 };
 
 export type MemberLocation = {
@@ -46,3 +48,5 @@ export type AppSettings = {
   startOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday
   timeFormat: '12h' | '24h';
 };
+
+export type UserRole = 'admin' | 'member' | 'child';

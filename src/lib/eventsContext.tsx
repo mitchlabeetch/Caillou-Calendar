@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { CalendarEvent, FamilyMember, Place, AppSettings } from '../types';
+import { CalendarEvent, FamilyMember, Place, AppSettings, UserRole } from '../types';
 
 export interface EventsContextType {
   events: CalendarEvent[];
@@ -7,7 +7,7 @@ export interface EventsContextType {
   deleteEvent: (id: string) => void;
   moveEvent: (id: string, newDate: string, newTime?: string) => void;
   swapEvents: (idA: string, idB: string) => void;
-  
+
   familyMembers: FamilyMember[];
   addFamilyMember: (member: FamilyMember) => void;
   updateFamilyMember: (id: string, updates: Partial<FamilyMember>) => void;
@@ -31,6 +31,8 @@ export interface EventsContextType {
   toggleEventSelectionForDelete: (id: string) => void;
   droppedEventId: string | null;
   triggerDropAnimation: (id: string) => void;
+
+  userRole: UserRole;
 }
 
 export const EventsContext = createContext<EventsContextType | null>(null);

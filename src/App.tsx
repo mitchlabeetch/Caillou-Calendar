@@ -19,9 +19,14 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from './lib/dateLocale';
 import { mockEvents, familyMembers } from './data/mockData';
-import { CalendarEvent, FamilyMember, AppSettings } from './types';
-
+import { CalendarEvent, FamilyMember, AppSettings, UserRole } from './types';
 import { EventsContext, useEvents } from './lib/eventsContext';
+import { localDb, flushOutboundSyncQueue } from './lib/localDb';
+import { syncInsert, syncUpdate, syncDelete } from './lib/syncEngine';
+import { canBulkDelete, canManageFamily, canManageSettings } from './lib/permissions';
+import { useIsMobile } from './hooks/useIsMobile';
+import { CalendarAgenda } from './components/CalendarAgenda';
+import { MemberFilterBar } from './components/MemberFilterBar';
 
 interface AppProps {
   timeZone?: string;
@@ -90,6 +95,8 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [userRole, setUserRole] = useState<UserRole>('admin');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     import('./lib/supabase').then(s => {
@@ -117,17 +124,27 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('synoptic-events');
-    if (saved) {
-      try {
-        setEvents(JSON.parse(saved));
-      } catch (e) {
-        console.error(e);
+    (async () => {
+      const dbEvents = await localDb.getEvents();
+      if (dbEvents.length > 0) {
+        setEvents(dbEvents);
+      } else {
+        const saved = localStorage.getItem('synoptic-events');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setEvents(parsed);
+            await localDb.setEvents(parsed);
+          } catch (e) {
+            console.error(e);
+          }
+        }
       }
-    }
+    })();
   }, []);
 
   useEffect(() => {
+    localDb.setEvents(events);
     localStorage.setItem('synoptic-events', JSON.stringify(events));
   }, [events]);
 
@@ -168,6 +185,15 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     });
   }, [user]);
 
+  // Network state watcher: flush outbound sync queue when coming back online
+  useEffect(() => {
+    const handleOnline = async () => {
+      if (navigator.onLine) await flushOutboundSyncQueue();
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -196,15 +222,68 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const [familyMembersState, setFamilyMembersState] = useState<FamilyMember[]>(() => {
-    try {
-      const saved = localStorage.getItem('synoptic-family');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
+  const [familyMembersState, setFamilyMembersState] = useState<FamilyMember[]>([]);
+  const [placesState, setPlacesState] = useState<{id: string, name: string, icon?: string}[]>([]);
+  const [settingsState, setSettingsState] = useState<AppSettings>({
+    startOfWeek: 1,
+    timeFormat: '24h'
   });
 
-  // Keep selected members in sync if family members are updated from backend/localStorage
+  // Load from IndexedDB (with localStorage migration fallback)
+  useEffect(() => {
+    (async () => {
+      const dbFamily = await localDb.getFamilyMembers();
+      if (dbFamily.length > 0) {
+        setFamilyMembersState(dbFamily);
+      } else {
+        const saved = localStorage.getItem('synoptic-family');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setFamilyMembersState(parsed);
+            await localDb.setFamilyMembers(parsed);
+          } catch {}
+        }
+      }
+
+      const dbPlaces = await localDb.getPlaces();
+      if (dbPlaces.length > 0) {
+        setPlacesState(dbPlaces);
+      } else {
+        const saved = localStorage.getItem('synoptic-places');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setPlacesState(parsed);
+            await localDb.setPlaces(parsed);
+          } catch {}
+        } else {
+          setPlacesState([
+            { id: '1', name: t('app.home'), icon: 'Home' },
+            { id: '2', name: t('app.school'), icon: 'BookOpen' },
+            { id: '3', name: t('app.work'), icon: 'Briefcase' },
+            { id: '4', name: t('app.gym'), icon: 'Dumbbell' }
+          ]);
+        }
+      }
+
+      const dbSettings = await localDb.getSettings();
+      if (dbSettings) {
+        setSettingsState(dbSettings);
+      } else {
+        const saved = localStorage.getItem('synoptic-settings');
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setSettingsState(parsed);
+            await localDb.setSettings(parsed);
+          } catch {}
+        }
+      }
+    })();
+  }, [t]);
+
+  // Keep selected members in sync
   useEffect(() => {
     if (familyMembersState.length > 0 && selectedMembers.length === 0) {
       if (!localStorage.getItem('synoptic-selected-members-init')) {
@@ -214,39 +293,18 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     }
   }, [familyMembersState]);
 
-  const [placesState, setPlacesState] = useState<{id: string, name: string, icon?: string}[]>(() => {
-    try {
-      const saved = localStorage.getItem('synoptic-places');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [
-      { id: '1', name: t('app.home'), icon: 'Home' },
-      { id: '2', name: t('app.school'), icon: 'BookOpen' },
-      { id: '3', name: t('app.work'), icon: 'Briefcase' },
-      { id: '4', name: t('app.gym'), icon: 'Dumbbell' }
-    ];
-  });
-
-  const [settingsState, setSettingsState] = useState<AppSettings>(() => {
-    try {
-      const saved = localStorage.getItem('synoptic-settings');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return {
-      startOfWeek: 1, // default to Monday for Europe, or depend on locale
-      timeFormat: '24h'
-    };
-  });
-
   useEffect(() => {
+    localDb.setFamilyMembers(familyMembersState);
     localStorage.setItem('synoptic-family', JSON.stringify(familyMembersState));
   }, [familyMembersState]);
 
   useEffect(() => {
+    localDb.setPlaces(placesState);
     localStorage.setItem('synoptic-places', JSON.stringify(placesState));
   }, [placesState]);
 
   useEffect(() => {
+    localDb.setSettings(settingsState);
     localStorage.setItem('synoptic-settings', JSON.stringify(settingsState));
   }, [settingsState]);
 
@@ -281,7 +339,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     setSettingsState(prev => {
       const next = { ...prev, ...updates };
       if (user && user.uid !== 'local-user') {
-        import('./lib/supabase').then(s => s.getSupabase()?.from('settings').upsert({ id: user.id, ownerId: user.id, ...next }));
+        syncUpdate('settings', 'app-settings', next);
       }
       return next;
     });
@@ -290,38 +348,38 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const addFamilyMember = (m: FamilyMember) => {
     setFamilyMembersState(prev => [...prev, m]);
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('family_members').insert({ ...m, ownerId: user.id }));
+      syncInsert('family_members', m);
     }
   };
   const updateFamilyMember = (id: string, updates: Partial<FamilyMember>) => {
     setFamilyMembersState(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('family_members').update(updates).eq('id', id));
+      syncUpdate('family_members', id, updates);
     }
   };
   const deleteFamilyMember = (id: string) => {
     setFamilyMembersState(prev => prev.filter(m => m.id !== id));
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('family_members').delete().eq('id', id));
+      syncDelete('family_members', id);
     }
   };
 
   const addPlace = (p: {id: string, name: string, icon?: string}) => {
     setPlacesState(prev => [...prev, p]);
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('places').insert({ ...p, ownerId: user.id }));
+      syncInsert('places', p);
     }
   };
   const updatePlace = (id: string, updates: Partial<{id: string, name: string, icon?: string}>) => {
     setPlacesState(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('places').update(updates).eq('id', id));
+      syncUpdate('places', id, updates);
     }
   };
   const deletePlace = (id: string) => {
     setPlacesState(prev => prev.filter(p => p.id !== id));
     if (user && user.uid !== 'local-user') {
-      import('./lib/supabase').then(s => s.getSupabase()?.from('places').delete().eq('id', id));
+      syncDelete('places', id);
     }
   };
 
@@ -345,9 +403,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const confirmDelete = async () => {
     if (eventsToDelete) {
       if (eventsToDelete.length === 1) {
-        import('./lib/eventsService').then(s => s.deleteEventFromFirestore(eventsToDelete[0]));
+        syncDelete('events', eventsToDelete[0]);
       } else {
-        import('./lib/eventsService').then(s => s.deleteEventsBatchFromFirestore(eventsToDelete));
+        syncDelete('events', eventsToDelete);
       }
       setEvents(prev => prev.filter(e => !eventsToDelete.includes(e.id)));
       setEventsToDelete(null);
@@ -360,7 +418,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   
   const moveEvent = (id: string, newDate: string, newTime?: string) => {
     const updates = { date: newDate, ...(newTime ? { startTime: newTime } : {}) };
-    import('./lib/eventsService').then(s => s.updateEventInFirestore(id, updates));
+    syncUpdate('events', id, updates);
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
   };
 
@@ -369,10 +427,8 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     const eventB = events.find(e => e.id === idB);
     if (!eventA || !eventB) return;
     
-    import('./lib/eventsService').then(s => {
-      s.updateEventInFirestore(idA, { date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime });
-      s.updateEventInFirestore(idB, { date: eventA.date, startTime: eventA.startTime, endTime: eventA.endTime });
-    });
+    syncUpdate('events', idA, { date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime });
+    syncUpdate('events', idB, { date: eventA.date, startTime: eventA.startTime, endTime: eventA.endTime });
     setEvents(prev => prev.map(e => {
       if (e.id === idA) {
         return { ...e, date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime };
@@ -486,7 +542,8 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, droppedEventId, triggerDropAnimation,
       familyMembers: familyMembersState, addFamilyMember, updateFamilyMember, deleteFamilyMember, reorderFamilyMembers: setFamilyMembersState,
       places: placesState, addPlace, updatePlace, deletePlace,
-      settings: settingsState, updateSettings
+      settings: settingsState, updateSettings,
+      userRole
     }}>
       <div className="font-body bg-[#fcffe4] min-h-screen text-ink flex flex-col overflow-x-hidden">
         <header className="h-[60px] md:h-[90px] bg-surface border-b-[4px] border-ink flex items-center justify-between px-1.5 md:px-8 z-10 shrink-0 gap-2">
@@ -560,42 +617,48 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
               {view === 'month' ? t('app.m') : t('app.w')}
             </button>
 
-            <button 
-              onClick={() => setIsSyncModalOpen(true)}
-              title={t('app.syncGoogleCalendar')}
-              className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
-            >
-              <RefreshCw className="w-4 h-4 md:w-7 md:h-7 font-bold text-ink" strokeWidth={3} />
-            </button>
-            <button 
-              onClick={() => {
-                exportEventsToICS(events, familyMembersState);
-                showToast(t('app.calendarExported'));
-              }}
-              title={t('app.exportCalendar')}
-              className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
-            >
-              <Download className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
-            </button>
-            <button 
-              onClick={() => window.print()}
-              title={t('app.printCalendar', 'Print Calendar')}
-              className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
-            >
-              <Printer className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
-            </button>
-            <button 
-              onClick={() => {
-                setIsMultiSelectMode(!isMultiSelectMode);
-                if (isMultiSelectMode) setSelectedEventIdsForDelete([]);
-              }}
-              className={cn(
-                "flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all",
-                isMultiSelectMode ? "bg-primary text-white" : "bg-surface"
-              )}
-            >
-              <CheckSquare className="w-4 h-4 md:w-8 md:h-8 font-bold" strokeWidth={3} />
-            </button>
+            {userRole !== 'child' && (
+              <button 
+                onClick={() => setIsSyncModalOpen(true)}
+                title={t('app.syncGoogleCalendar')}
+                className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+              >
+                <RefreshCw className="w-4 h-4 md:w-7 md:h-7 font-bold text-ink" strokeWidth={3} />
+              </button>
+            )}
+            {userRole !== 'child' && (
+              <>
+                <button 
+                  onClick={() => {
+                    exportEventsToICS(events, familyMembersState);
+                    showToast(t('app.calendarExported'));
+                  }}
+                  title={t('app.exportCalendar')}
+                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+                >
+                  <Download className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
+                </button>
+                <button 
+                  onClick={() => window.print()}
+                  title={t('app.printCalendar', 'Print Calendar')}
+                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+                >
+                  <Printer className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
+                </button>
+                <button 
+                  onClick={() => {
+                    setIsMultiSelectMode(!isMultiSelectMode);
+                    if (isMultiSelectMode) setSelectedEventIdsForDelete([]);
+                  }}
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all",
+                    isMultiSelectMode ? "bg-primary text-white" : "bg-surface"
+                  )}
+                >
+                  <CheckSquare className="w-4 h-4 md:w-8 md:h-8 font-bold" strokeWidth={3} />
+                </button>
+              </>
+            )}
             <button onClick={prev} className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all">
               <ChevronLeft className="w-4 h-4 md:w-8 md:h-8 font-bold" strokeWidth={3} />
             </button>
@@ -623,21 +686,11 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                     <p className="text-ink/60 font-bold mb-8 text-sm">{t('app.signInRequired')}</p>
                     <button 
                       onClick={() => import('./lib/supabase').then(async s => {
-                        const sb = s.getSupabase();
-                        if (sb) {
-                          try {
-                            const { error } = await sb.auth.signInWithOAuth({ 
-                              provider: 'google',
-                              options: {
-                                scopes: 'https://www.googleapis.com/auth/calendar.events'
-                              }
-                            });
-                            if (error) throw error;
-                          } catch (err) {
-                            console.error("Supabase OAuth failed. Falling back to local mode.", err);
-                            setUser({ uid: 'local-user', email: 'local@example.com' });
-                          }
-                        } else {
+                        try {
+                          const { error } = await s.signInWithGoogle();
+                          if (error) throw error;
+                        } catch (err) {
+                          console.error("Supabase OAuth failed. Falling back to local mode.", err);
                           setUser({ uid: 'local-user', email: 'local@example.com' });
                         }
                       })}
@@ -649,6 +702,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                </div>
              ) : null}
 
+             <MemberFilterBar />
              <AnimatePresence mode="wait" custom={direction}>
                <motion.div 
                  key={view + currentDate.toISOString()}
@@ -659,7 +713,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                  transition={{ duration: 0.3, ease: 'easeOut' }}
                  className="h-full flex flex-col"
                >
-                  {view === 'month' ? (
+                  {isMobile ? (
+                    <CalendarAgenda currentDate={currentDate} onDateClick={setSelectedDay} />
+                  ) : view === 'month' ? (
                     <CalendarMonth currentDate={currentDate} onDateClick={setSelectedDay} />
                   ) : (
                     <CalendarWeek currentDate={currentDate} onDateClick={setSelectedDay} />
@@ -667,12 +723,14 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                </motion.div>
              </AnimatePresence>
           
-            <button 
-              onClick={() => setIsAddModalOpen(true)}
-              className="absolute bottom-6 right-6 w-16 h-16 md:bottom-10 md:right-10 md:w-24 md:h-24 bg-primary rounded-full border-[3px] md:border-[5px] border-ink shadow-[4px_4px_0px_#1A1A1A] md:shadow-[6px_6px_0px_#1A1A1A] flex items-center justify-center cursor-pointer z-40 group tracking-widest active:translate-y-1"
-            >
-              <Plus className="w-8 h-8 md:w-14 md:h-14 text-ink font-bold group-hover:rotate-90 transition-transform duration-300" strokeWidth={4} />
-            </button>
+            {userRole !== 'child' && (
+              <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="absolute bottom-6 right-6 w-16 h-16 md:bottom-10 md:right-10 md:w-24 md:h-24 bg-primary rounded-full border-[3px] md:border-[5px] border-ink shadow-[4px_4px_0px_#1A1A1A] md:shadow-[6px_6px_0px_#1A1A1A] flex items-center justify-center cursor-pointer z-40 group tracking-widest active:translate-y-1"
+              >
+                <Plus className="w-8 h-8 md:w-14 md:h-14 text-ink font-bold group-hover:rotate-90 transition-transform duration-300" strokeWidth={4} />
+              </button>
+            )}
           </main>
         </div>
         

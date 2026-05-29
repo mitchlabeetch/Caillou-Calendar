@@ -1,7 +1,7 @@
 import { getSupabase } from './supabase';
 import { CalendarEvent } from '../types';
 
-export const addEventToFirestore = async (event: CalendarEvent) => {
+export const addEvent = async (event: CalendarEvent) => {
   try {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -18,7 +18,7 @@ export const addEventToFirestore = async (event: CalendarEvent) => {
   }
 };
 
-export const updateEventInFirestore = async (id: string, updates: Partial<CalendarEvent>) => {
+export const updateEvent = async (id: string, updates: Partial<CalendarEvent>) => {
   try {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -36,7 +36,7 @@ export const updateEventInFirestore = async (id: string, updates: Partial<Calend
   }
 };
 
-export const deleteEventFromFirestore = async (id: string) => {
+export const deleteEvent = async (id: string) => {
   try {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -50,7 +50,7 @@ export const deleteEventFromFirestore = async (id: string) => {
   }
 };
 
-export const deleteEventsBatchFromFirestore = async (ids: string[]) => {
+export const deleteEventsBatch = async (ids: string[]) => {
   try {
     const supabase = getSupabase();
     if (!supabase) return;

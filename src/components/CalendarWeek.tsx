@@ -40,6 +40,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
       if (!e || !e.date || !isValid(parseISO(e.date))) return false;
       if (!e.memberIds || !Array.isArray(e.memberIds) || !e.memberIds.some(id => selectedMembers.includes(id))) return false;
       if (!e.startTime || typeof e.startTime !== 'string') return false;
+      if (e.exceptionDates?.includes(dayStr)) return false;
       
       const eDate = parseISO(e.date);
       

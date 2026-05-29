@@ -16,3 +16,20 @@ export const getSupabase = () => {
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
   return supabaseInstance;
 };
+
+export const signInWithGoogle = () => {
+  const sb = getSupabase();
+  if (!sb) throw new Error("Supabase client not initialized");
+  return sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      scopes: 'https://www.googleapis.com/auth/calendar.events'
+    }
+  });
+};
+
+export const signOut = () => {
+  const sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  return sb.auth.signOut();
+};

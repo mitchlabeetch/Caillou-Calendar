@@ -1,12 +1,37 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Globe, Moon, Sun, Bell, Layout, Clock } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
+import { subscribeToPush, unsubscribeFromPush, getPushSubscription } from '../lib/pushNotifications';
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
   const { settings, updateSettings } = useEvents();
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    getPushSubscription().then(sub => setPushEnabled(!!sub));
+  }, [isOpen]);
+
+  const togglePush = async () => {
+    setPushLoading(true);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        const sub = await subscribeToPush();
+        setPushEnabled(!!sub);
+      }
+    } catch (e) {
+      console.error('Push toggle failed:', e);
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -64,10 +89,16 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
             <div className="flex flex-col gap-2">
               <label className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1"><Bell className="w-3 h-3"/> {t('app.notifications')}</label>
-              <div className="flex items-center justify-between p-3 border-[2px] border-ink rounded-xl bg-bg-light">
+              <button
+                onClick={togglePush}
+                disabled={pushLoading}
+                className="flex items-center justify-between p-3 border-[2px] border-ink rounded-xl bg-bg-light hover:bg-ink/5 transition-colors"
+              >
                 <span className="font-bold text-sm">{t('app.enablePush')}</span>
-                <input type="checkbox" className="w-5 h-5 cursor-pointer accent-primary" />
-              </div>
+                <div className={`w-12 h-6 rounded-full border-2 border-ink relative transition-colors ${pushEnabled ? 'bg-primary' : 'bg-gray-300'}`}>
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white border border-ink transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </div>
+              </button>
             </div>
             
             <div className="flex flex-col gap-2">
