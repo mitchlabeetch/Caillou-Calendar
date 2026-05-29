@@ -7,6 +7,7 @@ import { CalendarEvent, FamilyMember } from '../types';
 import { useEvents } from '../lib/eventsContext';
 import { X, Clock, Repeat, BellRing, CheckSquare, GripVertical, Gift } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
   const { t } = useTranslation();
@@ -199,6 +200,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
 
 function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string }) {
   const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId, userRole } = useEvents();
+  const isMobile = useIsMobile();
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean) as FamilyMember[];
 
   const isSelected = selectedEventIdsForDelete.includes(event.id);
@@ -288,7 +290,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
             event.recurrence && event.recurrence.type !== 'none' && <Repeat className="w-2.5 h-2.5 opacity-50 ml-auto" />
           )}
         </div>
-        <EventHoverCard event={event} />
+        {!isMobile && <EventHoverCard event={event} />}
       </motion.div>
     );
   }
@@ -359,7 +361,7 @@ function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string })
         </button>
       )}
       
-      <EventHoverCard event={event} />
+      {!isMobile && <EventHoverCard event={event} />}
     </motion.div>
   );
 }

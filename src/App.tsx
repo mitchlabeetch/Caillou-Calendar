@@ -106,9 +106,26 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         setAuthLoading(false);
         return;
       }
-      sb.auth.getSession().then(({ data: { session } }) => {
+      sb.auth.getSession().then(async ({ data: { session } }) => {
         setUser(session?.user ?? null);
         setAuthLoading(false);
+        if (session?.user && 'serviceWorker' in navigator && 'PushManager' in window) {
+          try {
+            const perm = Notification.permission;
+            if (perm === 'granted') {
+              const { subscribeToPush } = await import('./lib/pushNotifications');
+              await subscribeToPush();
+            } else if (perm === 'default') {
+              const result = await Notification.requestPermission();
+              if (result === 'granted') {
+                const { subscribeToPush } = await import('./lib/pushNotifications');
+                await subscribeToPush();
+              }
+            }
+          } catch (e) {
+            console.warn('Push registration failed', e);
+          }
+        }
       }).catch(err => {
         console.warn("Failed to get Supabase session.", err);
         setUser(null);
