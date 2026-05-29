@@ -28,7 +28,7 @@ function SidebarTooltip({ children, text, disabled }: { children: React.ReactNod
   );
 }
 
-export function Sidebar({ isOpenOnMobile, onCloseMobile }: { isOpenOnMobile?: boolean; onCloseMobile?: () => void }) {
+export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOnMobile?: boolean; onCloseMobile?: () => void; onSignOut?: () => void }) {
   const { t } = useTranslation();
   const { events, selectedMembers, toggleMember, familyMembers, updateFamilyMember, setEvents, reorderFamilyMembers, deleteFamilyMember } = useEvents();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -360,7 +360,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile }: { isOpenOnMobile?: bo
                 </button>
               </SidebarTooltip>
               <SidebarTooltip text={t('app.logout')}>
-                <button onClick={() => alert('Logged out')} className="flex items-center justify-center p-2 text-ink/50 hover:text-ink hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all">
+                <button onClick={() => onSignOut?.()} className="flex items-center justify-center p-2 text-ink/50 hover:text-ink hover:-translate-y-1 hover:scale-110 active:scale-95 transition-all">
                   <LogOut className="w-6 h-6" />
                 </button>
               </SidebarTooltip>
@@ -387,7 +387,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile }: { isOpenOnMobile?: bo
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.logout')} disabled={true}>
-                  <button onClick={() => alert('Logged out')} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
+                  <button onClick={() => onSignOut?.()} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <LogOut className="w-4 h-4 shrink-0 text-red-500/70 group-hover:text-red-600 transition-colors group-hover:-translate-x-1" />
                     <span className="text-xs font-bold truncate text-red-600">{t('app.logout')}</span>
                   </button>

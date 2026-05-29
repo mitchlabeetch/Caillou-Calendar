@@ -12,6 +12,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
   const { t } = useTranslation();
   const { events, setEvents, moveEvent, selectedMembers, familyMembers, settings, triggerDropAnimation } = useEvents();
+  const isMobile = useIsMobile();
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -141,7 +142,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
               <div className="flex flex-col gap-2 mt-1 overflow-visible">
                 {dayEvents.map(event => (
                   <React.Fragment key={event.id}>
-                    <EventPill event={event} dayStr={format(day, 'yyyy-MM-dd')} />
+                    <EventPill event={event} dayStr={format(day, 'yyyy-MM-dd')} isMobile={isMobile} />
                   </React.Fragment>
                 ))}
               </div>
@@ -198,9 +199,8 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
   );
 }
 
-function EventPill({ event, dayStr }: { event: CalendarEvent, dayStr?: string }) {
+function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?: string, isMobile: boolean }) {
   const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId, userRole } = useEvents();
-  const isMobile = useIsMobile();
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean) as FamilyMember[];
 
   const isSelected = selectedEventIdsForDelete.includes(event.id);

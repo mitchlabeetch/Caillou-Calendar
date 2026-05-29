@@ -137,6 +137,23 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     });
   }, []);
 
+  const handleSignOut = async () => {
+    try {
+      if ('serviceWorker' in navigator && 'PushManager' in window) {
+        const { unsubscribeFromPush } = await import('./lib/pushNotifications');
+        await unsubscribeFromPush();
+      }
+    } catch (e) {
+      console.warn('Push unsubscribe failed during sign-out', e);
+    }
+    const { getSupabase } = await import('./lib/supabase');
+    const sb = getSupabase();
+    if (sb) {
+      await sb.auth.signOut();
+    }
+    setUser(null);
+  };
+
   useEffect(() => {
     (async () => {
       const dbEvents = await localDb.getEvents();
@@ -683,7 +700,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         </header>
         
         <div className="flex flex-1 overflow-hidden relative">
-          <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} />
+          <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} onSignOut={handleSignOut} />
           
           <main className="flex-1 flex flex-col relative bg-[#fcffe4] p-2 overflow-hidden">
              {authLoading ? (
