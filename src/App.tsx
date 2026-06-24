@@ -21,6 +21,7 @@ import { getDateLocale } from './lib/dateLocale';
 import { mockEvents, familyMembers } from './data/mockData';
 import { CalendarEvent, FamilyMember, AppSettings, UserRole } from './types';
 import { EventsContext, useEvents } from './lib/eventsContext';
+import { dbRowToEvent, dbRowToMember, dbRowToSettings } from './lib/supabase';
 import { localDb, flushOutboundSyncQueue } from './lib/localDb';
 import { syncInsert, syncUpdate, syncDelete } from './lib/syncEngine';
 import { canBulkDelete, canManageFamily, canManageSettings } from './lib/permissions';
@@ -96,6 +97,13 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState<UserRole>('admin');
+
+  // Email/password auth form state
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -192,10 +200,10 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
           const { data, error } = await sb
             .from('events')
             .select('*')
-            .eq('ownerId', user.id);
+            .eq('owner_id', user.id);
           
           if (!error && data) {
-            setEvents(data as CalendarEvent[]);
+            setEvents(data.map(dbRowToEvent));
           }
         } catch (e) {
           console.warn('Failed to fetch events from Supabase', e);
@@ -206,7 +214,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
 
       const subscription = sb
         .channel('events_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `ownerId=eq.${user.id}` }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `owner_id=eq.${user.id}` }, () => {
           fetchEvents();
         })
         .subscribe();
@@ -347,17 +355,17 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       if (!sb) return;
 
       const fetchFamily = async () => {
-        const { data } = await sb.from('family_members').select('*').eq('ownerId', user.id);
-        if (data && data.length > 0) setFamilyMembersState(data);
+        const { data } = await sb.from('family_members').select('*').eq('owner_id', user.id);
+        if (data && data.length > 0) setFamilyMembersState(data.map(dbRowToMember));
       };
       const fetchPlaces = async () => {
-        const { data } = await sb.from('places').select('*').eq('ownerId', user.id);
+        const { data } = await sb.from('places').select('*').eq('owner_id', user.id);
         if (data && data.length > 0) setPlacesState(data);
       };
       const fetchSettings = async () => {
-        const { data } = await sb.from('settings').select('*').eq('ownerId', user.id).single();
+        const { data } = await sb.from('settings').select('*').eq('owner_id', user.id).single();
         if (data) {
-          setSettingsState(prev => ({ ...prev, ...data }));
+          setSettingsState(prev => ({ ...prev, ...dbRowToSettings(data) }));
         }
       };
 
@@ -710,13 +718,78 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                </div>
              ) : !user ? (
                <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#fcffe4]/90 backdrop-blur-md">
-                  <div className="p-8 bg-surface border-[4px] border-ink shadow-[8px_8px_0px_#1A1A1A] rounded-3xl flex flex-col items-center max-w-sm w-full mx-4 text-center">
+                  <div className="p-8 bg-surface border-[4px] border-ink shadow-[8px_8px_0px_#1A1A1A] rounded-3xl flex flex-col items-center max-w-sm w-full mx-4">
                     <div className="w-20 h-20 bg-mem-2 rounded-full border-[3px] border-ink flex items-center justify-center shadow-neo mb-6">
                       <InteractiveLogo />
                     </div>
-                    <h2 className="text-2xl font-black mb-4">{t('app.synopticFamily')}</h2>
-                    <p className="text-ink/60 font-bold mb-8 text-sm">{t('app.signInRequired')}</p>
-                    <button 
+                    <h2 className="text-2xl font-black mb-1 text-center">{t('app.synopticFamily')}</h2>
+                    <p className="text-ink/60 font-bold mb-6 text-sm text-center">{t('app.signInRequired')}</p>
+
+                    {/* Email / Password form */}
+                    <form
+                      className="w-full flex flex-col gap-3"
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setAuthError(null);
+                        setAuthSubmitting(true);
+                        try {
+                          const { signInWithEmail, signUpWithEmail } = await import('./lib/supabase');
+                          if (authMode === 'signin') {
+                            const { error } = await signInWithEmail(authEmail, authPassword);
+                            if (error) throw error;
+                          } else {
+                            const { error } = await signUpWithEmail(authEmail, authPassword);
+                            if (error) throw error;
+                          }
+                        } catch (err: any) {
+                          setAuthError(err.message ?? 'Authentication failed');
+                        } finally {
+                          setAuthSubmitting(false);
+                        }
+                      }}
+                    >
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        required
+                        value={authEmail}
+                        onChange={e => setAuthEmail(e.target.value)}
+                        className="w-full h-12 px-4 rounded-xl border-[3px] border-ink font-bold bg-white/80 focus:outline-none focus:ring-2 focus:ring-primary text-ink placeholder:text-ink/40"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        required
+                        value={authPassword}
+                        onChange={e => setAuthPassword(e.target.value)}
+                        className="w-full h-12 px-4 rounded-xl border-[3px] border-ink font-bold bg-white/80 focus:outline-none focus:ring-2 focus:ring-primary text-ink placeholder:text-ink/40"
+                      />
+                      {authError && (
+                        <p className="text-[#FF5722] font-bold text-sm text-center">{authError}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={authSubmitting}
+                        className="bg-primary w-full text-white font-black text-base px-8 py-3.5 rounded-xl border-[3px] border-ink hover:-translate-y-1 hover:shadow-neo transition-all shadow-[4px_4px_0px_#1A1A1A] active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0"
+                      >
+                        {authSubmitting ? '...' : authMode === 'signin' ? t('app.signIn', 'Sign in') : t('app.createAccount', 'Create account')}
+                      </button>
+                    </form>
+
+                    <button
+                      onClick={() => { setAuthMode(m => m === 'signin' ? 'signup' : 'signin'); setAuthError(null); }}
+                      className="mt-3 text-sm font-bold text-ink/60 hover:text-ink transition-colors"
+                    >
+                      {authMode === 'signin' ? t('app.noAccount', "Don't have an account? Sign up") : t('app.hasAccount', 'Already have an account? Sign in')}
+                    </button>
+
+                    <div className="w-full flex items-center gap-3 my-4">
+                      <div className="flex-1 h-[2px] bg-ink/15 rounded" />
+                      <span className="text-xs font-bold text-ink/40 uppercase tracking-wider">or</span>
+                      <div className="flex-1 h-[2px] bg-ink/15 rounded" />
+                    </div>
+
+                    <button
                       onClick={() => import('./lib/supabase').then(async s => {
                         try {
                           const { error } = await s.signInWithGoogle();
@@ -726,8 +799,14 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                           setUser({ uid: 'local-user', email: 'local@example.com' });
                         }
                       })}
-                      className="bg-primary w-full text-white font-black text-lg px-8 py-4 rounded-xl border-[4px] border-ink hover:-translate-y-1 hover:shadow-neo transition-all shadow-[4px_4px_0px_#1A1A1A] active:translate-y-0 active:shadow-none"
+                      className="w-full h-11 rounded-xl border-[3px] border-ink font-bold text-sm bg-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#1A1A1A] transition-all flex items-center justify-center gap-2 text-ink"
                     >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
                       {t('app.signInWithGoogle')}
                     </button>
                   </div>
