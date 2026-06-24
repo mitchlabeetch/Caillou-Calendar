@@ -586,6 +586,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       userRole
     }}>
       <div className="font-body bg-[#fcffe4] min-h-screen text-ink flex flex-col overflow-x-hidden">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:bg-primary focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold">
+          Skip to main content
+        </a>
         <header className="h-[60px] md:h-[90px] bg-surface border-b-[4px] border-ink flex items-center justify-between px-1.5 md:px-8 z-10 shrink-0 gap-2">
           <div className="flex items-center gap-1.5 md:gap-6 flex-1 min-w-0">
             <button
