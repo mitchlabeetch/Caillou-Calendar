@@ -1,0 +1,359 @@
+# Instincts generated from https://github.com/mitchlabeetch/Caillou-Calendar
+# Generated: 2026-06-24T19:25:18.942Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: Caillou-Calendar-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 2 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat: add email/password auth form and update Supabase data handling, feat: add skip to main content link and update font import
+
+---
+id: Caillou-Calendar-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Commit Length
+
+## Action
+
+Write moderate-length commit messages (~63 characters)
+
+## Evidence
+
+- Average commit message length: 63 chars
+- Based on 2 commits
+
+---
+id: Caillou-Calendar-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: Caillou-Calendar-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: Caillou-Calendar-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: Caillou-Calendar-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: lib
+
+---
+id: Caillou-Calendar-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: caillou-calendar-instinct-file-naming
+trigger: "When creating a new file in the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct File Naming
+
+## Action
+
+Name the file using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.files: camelCase
+
+---
+id: caillou-calendar-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Function Naming
+
+## Action
+
+Name the function using camelCase
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: caillou-calendar-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+
+---
+id: caillou-calendar-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: caillou-calendar-instinct-import-style
+trigger: "When importing modules within the codebase"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: caillou-calendar-instinct-export-style
+trigger: "When exporting modules or functions"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: caillou-calendar-instinct-commit-format
+trigger: "When making a git commit"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Commit Format
+
+## Action
+
+Format the commit message using the conventional commits standard with the 'feat' prefix for new features
+
+## Evidence
+
+- Pattern in commits.type: conventional
+- Pattern in commits.prefixes: ['feat']
+- Seen in commit: 'feat: add email/password auth form and update Supabase data handling'
+
+---
+id: caillou-calendar-instinct-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, around 63 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength: 63
+
+---
+id: caillou-calendar-instinct-try-catch-errors
+trigger: "When handling errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Try Catch Errors
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style: try-catch
+
+---
+id: caillou-calendar-instinct-test-location
+trigger: "When adding or organizing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Test Location
+
+## Action
+
+Place test files in a separate location from source files
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation: separate
+
+---
+id: caillou-calendar-instinct-src-layout
+trigger: "When adding new source code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: mitchlabeetch/Caillou-Calendar
+---
+
+# Caillou Calendar Instinct Src Layout
+
+## Action
+
+Place new code in the 'src' directory, using 'lib' for libraries if needed
+
+## Evidence
+
+- Pattern in architecture.folderStructure.srcLayout: ['lib']
+- Pattern in architecture.folderStructure.commonFolders: ['src']
+
