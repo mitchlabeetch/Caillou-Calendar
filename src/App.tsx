@@ -3,13 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, createContext, useContext, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CalendarMonth } from './components/CalendarMonth';
 import { CalendarWeek } from './components/CalendarWeek';
 import { AddEventModal } from './components/AddEventModal';
 import { EventDetailModal } from './components/EventDetailModal';
 import { DayEventsModal } from './components/DayEventsModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ModalShell } from './components/ModalShell';
 import { ReminderSystem } from './components/ReminderSystem';
 import { format, addMonths, subMonths, addWeeks, subWeeks, isSameMonth, isSameWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, AlertCircle, BellRing, CheckSquare, Trash2, Download, Printer, Menu, RefreshCw } from 'lucide-react';
@@ -18,20 +20,29 @@ import { exportEventsToICS } from './lib/exportIcs';
 import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from './lib/dateLocale';
-import { mockEvents, familyMembers } from './data/mockData';
-import { CalendarEvent, FamilyMember, AppSettings, UserRole } from './types';
-import { EventsContext, useEvents } from './lib/eventsContext';
+import { CalendarEvent, FamilyMember, AppSettings } from './types';
+import { EventsContext } from './lib/eventsContext';
 import { dbRowToEvent, dbRowToMember, dbRowToSettings } from './lib/supabase';
 import { localDb, flushOutboundSyncQueue } from './lib/localDb';
 import { syncInsert, syncUpdate, syncDelete } from './lib/syncEngine';
-import { canBulkDelete, canManageFamily, canManageSettings } from './lib/permissions';
 import { useIsMobile } from './hooks/useIsMobile';
+import { useAuth } from './hooks/useAuth';
+import { useToasts } from './hooks/useToasts';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
+import { usePersistedCurrentDate } from './hooks/usePersistedCurrentDate';
+import { usePersistedSelectedMembers } from './hooks/usePersistedSelectedMembers';
+import { useUserRole } from './hooks/useUserRole';
 import { CalendarAgenda } from './components/CalendarAgenda';
 import { MemberFilterBar } from './components/MemberFilterBar';
 
 interface AppProps {
+  // AppProps.timeZone is reserved for the timezone story tracked in
+  // wiki/operations/18-production-audit.md (Phase 3). Unused at the moment.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   timeZone?: string;
 }
+
+void ({} as AppProps);
 
 function InteractiveLogo({ onClick, familyMembers = [] }: { onClick?: () => void, familyMembers?: any[] }) {
   const lastTrigger = useRef(0);
@@ -71,7 +82,7 @@ function InteractiveLogo({ onClick, familyMembers = [] }: { onClick?: () => void
   );
 }
 
-export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
+export default function App(_props: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<'month'|'week'>(() => {
     try {
@@ -89,14 +100,13 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [direction, setDirection] = useState(1);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = usePersistedCurrentDate();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [user, setUser] = useState<any>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [userRole, setUserRole] = useState<UserRole>('admin');
+  const { user, loading: authLoading, signOut: handleSignOut } = useAuth();
+  const [userRole] = useUserRole();
 
   // Email/password auth form state
   const [authEmail, setAuthEmail] = useState('');
@@ -107,85 +117,34 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    import('./lib/supabase').then(s => {
-      const sb = s.getSupabase();
-      if (!sb) {
-        setUser({ uid: 'local-user', email: 'local@example.com' });
-        setAuthLoading(false);
-        return;
-      }
-      sb.auth.getSession().then(async ({ data: { session } }) => {
-        setUser(session?.user ?? null);
-        setAuthLoading(false);
-        if (session?.user && 'serviceWorker' in navigator && 'PushManager' in window) {
-          try {
-            let permGranted = Notification.permission === 'granted';
-            if (!permGranted && Notification.permission === 'default') {
-              permGranted = (await Notification.requestPermission()) === 'granted';
-            }
-            if (permGranted) {
-              const { subscribeToPush } = await import('./lib/pushNotifications');
-              await subscribeToPush();
-            }
-          } catch (e) {
-            console.warn('Push registration failed', e);
-          }
-        }
-      }).catch(err => {
-        console.warn("Failed to get Supabase session.", err);
-        setUser(null);
-        setAuthLoading(false);
-      });
-      const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
-        setUser(session?.user ?? null);
-      });
-      return () => {
-        subscription.unsubscribe();
-      };
-    });
-  }, []);
-
-  const handleSignOut = async () => {
-    const timeout = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
-    try {
-      if ('serviceWorker' in navigator && 'PushManager' in window) {
-        const { unsubscribeFromPush } = await import('./lib/pushNotifications');
-        await Promise.race([unsubscribeFromPush(), timeout(3000)]);
-      }
-    } catch (e) {
-      console.warn('Push unsubscribe failed during sign-out', e);
-    }
-    const { getSupabase } = await import('./lib/supabase');
-    const sb = getSupabase();
-    if (sb) {
-      await sb.auth.signOut();
-    }
-    setUser(null);
-  };
-
-  useEffect(() => {
     (async () => {
       const dbEvents = await localDb.getEvents();
       if (dbEvents.length > 0) {
         setEvents(dbEvents);
-      } else {
-        const saved = localStorage.getItem('synoptic-events');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setEvents(parsed);
-            await localDb.setEvents(parsed);
-          } catch (e) {
-            console.error(e);
-          }
+        return;
+      }
+      // One-shot migration: pull events out of the legacy localStorage
+      // shim, then delete the key so we don't keep two sources of truth
+      // around. See wiki/operations/18-production-audit.md §12 (🔴 #7).
+      const saved = localStorage.getItem('synoptic-events');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setEvents(parsed);
+          await localDb.setEvents(parsed);
+          localStorage.removeItem('synoptic-events');
+        } catch (e) {
+          console.error('Failed to migrate events from localStorage', e);
         }
       }
     })();
   }, []);
 
   useEffect(() => {
-    localDb.setEvents(events);
-    localStorage.setItem('synoptic-events', JSON.stringify(events));
+    // Events now live exclusively in IndexedDB. UI preferences
+    // (theme, currentDate, etc.) continue to use localStorage because
+    // they are tiny scalars and don't need a query layer.
+    void localDb.setEvents(events);
   }, [events]);
 
   useEffect(() => {
@@ -200,7 +159,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
           const { data, error } = await sb
             .from('events')
             .select('*')
-            .eq('owner_id', user.id);
+            .eq('owner_id', user.uid);
           
           if (!error && data) {
             setEvents(data.map(dbRowToEvent));
@@ -214,7 +173,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
 
       const subscription = sb
         .channel('events_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `owner_id=eq.${user.id}` }, () => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `owner_id=eq.${user.uid}` }, () => {
           fetchEvents();
         })
         .subscribe();
@@ -234,14 +193,10 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     return () => window.removeEventListener('online', handleOnline);
   }, []);
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const { toasts, showToast: showToastFromHook, dismissToast } = useToasts();
+  const { selectedMembers, setSelectedMembers, toggleMember } = usePersistedSelectedMembers();
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedEventIdsForDelete, setSelectedEventIdsForDelete] = useState<string[]>([]);
-
-  const toggleMember = (id: string) => {
-    setSelectedMembers(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
-  };
 
   const toggleEventSelectionForDelete = (id: string) => {
     setSelectedEventIdsForDelete(prev => 
@@ -269,7 +224,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
     timeFormat: '24h'
   });
 
-  // Load from IndexedDB (with localStorage migration fallback)
+  // Load from IndexedDB (with localStorage migration fallback for users
+  // who were on the pre-IndexedDB shim). The localStorage keys are
+  // removed after migration to keep a single source of truth.
   useEffect(() => {
     (async () => {
       const dbFamily = await localDb.getFamilyMembers();
@@ -282,6 +239,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
             const parsed = JSON.parse(saved);
             setFamilyMembersState(parsed);
             await localDb.setFamilyMembers(parsed);
+            localStorage.removeItem('synoptic-family');
           } catch {}
         }
       }
@@ -289,22 +247,23 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       const dbPlaces = await localDb.getPlaces();
       if (dbPlaces.length > 0) {
         setPlacesState(dbPlaces);
-      } else {
+      } else if (localStorage.getItem('synoptic-places')) {
         const saved = localStorage.getItem('synoptic-places');
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
             setPlacesState(parsed);
             await localDb.setPlaces(parsed);
+            localStorage.removeItem('synoptic-places');
           } catch {}
-        } else {
-          setPlacesState([
-            { id: '1', name: t('app.home'), icon: 'Home' },
-            { id: '2', name: t('app.school'), icon: 'BookOpen' },
-            { id: '3', name: t('app.work'), icon: 'Briefcase' },
-            { id: '4', name: t('app.gym'), icon: 'Dumbbell' }
-          ]);
         }
+      } else {
+        setPlacesState([
+          { id: '1', name: t('app.home'), icon: 'Home' },
+          { id: '2', name: t('app.school'), icon: 'BookOpen' },
+          { id: '3', name: t('app.work'), icon: 'Briefcase' },
+          { id: '4', name: t('app.gym'), icon: 'Dumbbell' }
+        ]);
       }
 
       const dbSettings = await localDb.getSettings();
@@ -317,36 +276,34 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
             const parsed = JSON.parse(saved);
             setSettingsState(parsed);
             await localDb.setSettings(parsed);
+            localStorage.removeItem('synoptic-settings');
           } catch {}
         }
       }
     })();
   }, [t]);
 
-  // Keep selected members in sync
+  // First-run seed: when the family loads and no persisted filter
+  // exists yet, default to all members visible. The `usePersistedSelectedMembers`
+  // hook handles subsequent reads/writes.
   useEffect(() => {
-    if (familyMembersState.length > 0 && selectedMembers.length === 0) {
-      if (!localStorage.getItem('synoptic-selected-members-init')) {
+    if (familyMembersState.length === 0) return;
+    try {
+      const hasPersist = localStorage.getItem('synoptic-selected-members-persist');
+      const hasLegacy = localStorage.getItem('synoptic-selected-members-init');
+      if (!hasPersist && !hasLegacy) {
         setSelectedMembers(familyMembersState.map(m => m.id));
         localStorage.setItem('synoptic-selected-members-init', 'true');
       }
-    }
+    } catch {}
   }, [familyMembersState]);
 
-  useEffect(() => {
-    localDb.setFamilyMembers(familyMembersState);
-    localStorage.setItem('synoptic-family', JSON.stringify(familyMembersState));
-  }, [familyMembersState]);
-
-  useEffect(() => {
-    localDb.setPlaces(placesState);
-    localStorage.setItem('synoptic-places', JSON.stringify(placesState));
-  }, [placesState]);
-
-  useEffect(() => {
-    localDb.setSettings(settingsState);
-    localStorage.setItem('synoptic-settings', JSON.stringify(settingsState));
-  }, [settingsState]);
+  // Family, places, and settings all live exclusively in IndexedDB
+  // now. UI preferences (selectedMembers, theme, currentDate, …)
+  // continue to use localStorage because they are cheap scalars.
+  useEffect(() => { void localDb.setFamilyMembers(familyMembersState); }, [familyMembersState]);
+  useEffect(() => { void localDb.setPlaces(placesState); }, [placesState]);
+  useEffect(() => { void localDb.setSettings(settingsState); }, [settingsState]);
 
   useEffect(() => {
     if (!user || user.uid === 'local-user') return;
@@ -355,15 +312,15 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       if (!sb) return;
 
       const fetchFamily = async () => {
-        const { data } = await sb.from('family_members').select('*').eq('owner_id', user.id);
+        const { data } = await sb.from('family_members').select('*').eq('owner_id', user.uid);
         if (data && data.length > 0) setFamilyMembersState(data.map(dbRowToMember));
       };
       const fetchPlaces = async () => {
-        const { data } = await sb.from('places').select('*').eq('owner_id', user.id);
+        const { data } = await sb.from('places').select('*').eq('owner_id', user.uid);
         if (data && data.length > 0) setPlacesState(data);
       };
       const fetchSettings = async () => {
-        const { data } = await sb.from('settings').select('*').eq('owner_id', user.id).single();
+        const { data } = await sb.from('settings').select('*').eq('owner_id', user.uid).single();
         if (data) {
           setSettingsState(prev => ({ ...prev, ...dbRowToSettings(data) }));
         }
@@ -441,34 +398,55 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   const deleteEvent = (id: string) => setEventsToDelete([id]);
   const triggerBulkDelete = () => setEventsToDelete(selectedEventIdsForDelete);
   const confirmDelete = async () => {
-    if (eventsToDelete) {
+    if (!eventsToDelete) return;
+    // Optimistic delete: remove from local state first, then sync.
+    // If sync throws, restore the deleted items so the UI stays consistent.
+    const removed = events.filter(e => eventsToDelete.includes(e.id));
+    setEvents(prev => prev.filter(e => !eventsToDelete.includes(e.id)));
+    setEventsToDelete(null);
+    if (isMultiSelectMode) {
+      setIsMultiSelectMode(false);
+      setSelectedEventIdsForDelete([]);
+    }
+    try {
       if (eventsToDelete.length === 1) {
-        syncDelete('events', eventsToDelete[0]);
+        await syncDelete('events', eventsToDelete[0]);
       } else {
-        syncDelete('events', eventsToDelete);
+        await syncDelete('events', eventsToDelete);
       }
-      setEvents(prev => prev.filter(e => !eventsToDelete.includes(e.id)));
-      setEventsToDelete(null);
-      if (isMultiSelectMode) {
-        setIsMultiSelectMode(false);
-        setSelectedEventIdsForDelete([]);
-      }
+    } catch (err) {
+      console.warn('Delete sync failed; rolling back', err);
+      setEvents(prev => {
+        const restored = new Map(removed.map(e => [e.id, e]));
+        const next = [...prev];
+        for (let i = 0; i < next.length; i++) {
+          if (restored.has(next[i].id)) next[i] = restored.get(next[i].id)!;
+        }
+        return [...removed.filter(r => !next.some(e => e.id === r.id)), ...next];
+      });
+      showToast(t('app.syncFailed', 'Sync failed — change reverted'));
     }
   };
-  
+
   const moveEvent = (id: string, newDate: string, newTime?: string) => {
+    // Optimistic update: capture previous, apply new, sync, rollback on error.
+    const previous = events.find(e => e.id === id);
+    if (!previous) return;
     const updates = { date: newDate, ...(newTime ? { startTime: newTime } : {}) };
-    syncUpdate('events', id, updates);
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    void syncUpdate('events', id, updates).catch((err) => {
+      console.warn('Move sync failed; rolling back', err);
+      setEvents(prev => prev.map(e => e.id === id ? previous : e));
+      showToast(t('app.syncFailed', 'Sync failed — change reverted'));
+    });
   };
 
   const swapEvents = (idA: string, idB: string) => {
     const eventA = events.find(e => e.id === idA);
     const eventB = events.find(e => e.id === idB);
     if (!eventA || !eventB) return;
-    
-    syncUpdate('events', idA, { date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime });
-    syncUpdate('events', idB, { date: eventA.date, startTime: eventA.startTime, endTime: eventA.endTime });
+
+    // Optimistic swap with rollback on either side failing.
     setEvents(prev => prev.map(e => {
       if (e.id === idA) {
         return { ...e, date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime };
@@ -478,85 +456,50 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
       }
       return e;
     }));
+    const aUpdates = { date: eventB.date, startTime: eventB.startTime, endTime: eventB.endTime };
+    const bUpdates = { date: eventA.date, startTime: eventA.startTime, endTime: eventA.endTime };
+    void syncUpdate('events', idA, aUpdates)
+      .then(() => syncUpdate('events', idB, bUpdates))
+      .catch((err) => {
+        console.warn('Swap sync failed; rolling back', err);
+        setEvents(prev => prev.map(e => {
+          if (e.id === idA) return eventA;
+          if (e.id === idB) return eventB;
+          return e;
+        }));
+        showToast(t('app.syncFailed', 'Sync failed — change reverted'));
+      });
   };
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  const showToast = useCallback((msg: string) => {
+    // Bridge to the multi-toast hook so old call-sites keep working.
+    showToastFromHook(msg);
+  }, [showToastFromHook]);
 
   const prev = () => {
     setDirection(-1);
-    setCurrentDate(c => view === 'month' ? subMonths(c, 1) : subWeeks(c, 1));
+    setCurrentDate(view === 'month' ? subMonths(currentDate, 1) : subWeeks(currentDate, 1));
   };
-  
+
   const next = () => {
     setDirection(1);
-    setCurrentDate(c => view === 'month' ? addMonths(c, 1) : addWeeks(c, 1));
+    setCurrentDate(view === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1));
   };
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName || '')) {
-        if (e.key === 'Escape') {
-          (document.activeElement as HTMLElement).blur();
-        }
-        return;
-      }
-      
-      // If a modal is open, prevent navigation
-      if (isAddModalOpen || selectedEventId || selectedDay || document.querySelector('[role="dialog"]')) {
-        if (e.key === 'Escape') {
-          setIsAddModalOpen(false);
-          setSelectedEventId(null);
-          setSelectedDay(null);
-        }
-        return;
-      }
 
-      switch (e.key) {
-        case 'ArrowLeft':
-          if (e.shiftKey) {
-            setDirection(-1);
-            setCurrentDate(c => view === 'month' ? subMonths(c, 1) : subWeeks(c, 1));
-          } else {
-            setCurrentDate(c => new Date(c.getFullYear(), c.getMonth(), c.getDate() - 1));
-          }
-          break;
-        case 'ArrowRight':
-          if (e.shiftKey) {
-            setDirection(1);
-            setCurrentDate(c => view === 'month' ? addMonths(c, 1) : addWeeks(c, 1));
-          } else {
-            setCurrentDate(c => new Date(c.getFullYear(), c.getMonth(), c.getDate() + 1));
-          }
-          break;
-        case 'ArrowUp':
-          setView('month');
-          break;
-        case 'ArrowDown':
-          setView('week');
-          break;
-        case 'm':
-        case 'M':
-          setView('month');
-          break;
-        case 'w':
-        case 'W':
-          setView('week');
-          break;
-        case 't':
-        case 'T':
-          setDirection(0);
-          setCurrentDate(new Date());
-          break;
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [view, isAddModalOpen, selectedEventId, selectedDay]);
+  // Centralised keyboard shortcuts (←/→, Shift+←/→, M, W, T, 1–9).
+  useKeyboardShortcuts({
+    view,
+    setView,
+    currentDate,
+    setCurrentDate: (d) => {
+      // Direction animation: hint the AnimatePresence when the
+      // month/week flips, hold steady for ±1 day navigation.
+      setDirection(prevDir => (d > currentDate ? 1 : d < currentDate ? -1 : prevDir));
+      setCurrentDate(d);
+    },
+    toggleMember,
+    familyMembers: familyMembersState,
+  });
 
   const now = new Date();
   let formattedTitle = '';
@@ -577,15 +520,16 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
   }
 
   return (
-    <EventsContext.Provider value={{ 
+    <EventsContext.Provider value={{
       events, setEvents, deleteEvent, moveEvent, swapEvents, showToast, selectedMembers, toggleMember, setSelectedEventId,
       isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, droppedEventId, triggerDropAnimation,
       familyMembers: familyMembersState, addFamilyMember, updateFamilyMember, deleteFamilyMember, reorderFamilyMembers: setFamilyMembersState,
       places: placesState, addPlace, updatePlace, deletePlace,
       settings: settingsState, updateSettings,
-      userRole
+      userRole,
+      user
     }}>
-      <div className="font-body bg-[#fcffe4] min-h-screen text-ink flex flex-col overflow-x-hidden">
+      <div className="font-body bg-bg-app min-h-screen text-ink flex flex-col overflow-x-hidden">
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:bg-primary focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold">
           Skip to main content
         </a>
@@ -593,7 +537,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
           <div className="flex items-center gap-1.5 md:gap-6 flex-1 min-w-0">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full border-[2px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] shrink-0"
+              className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full border-[2px] border-ink bg-surface shadow-neo-sm shrink-0"
             >
               <Menu className="w-4 h-4 font-bold text-ink" strokeWidth={3} />
             </button>
@@ -612,9 +556,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                   <motion.div
                     key={formattedTitle}
                     custom={direction}
-                    initial={(dir) => ({ opacity: 0, y: dir * 15 })}
+                    initial={{ opacity: 0, y: direction * 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={(dir) => ({ opacity: 0, y: -dir * 15 })}
+                    exit={{ opacity: 0, y: -direction * 15 }}
                     transition={{ duration: 0.3 }}
                     className="whitespace-nowrap truncate min-w-0"
                   >
@@ -631,12 +575,12 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
 
           <div className="print-hide flex gap-1.5 md:gap-4 items-center shrink-0">
             {/* Desktop View Switcher */}
-            <div className="hidden sm:flex items-center bg-surface border-[2px] md:border-thick rounded-full p-1 shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo h-[36px] sm:h-[40px] md:h-[52px]">
+            <div className="hidden sm:flex items-center bg-surface border-[2px] md:border-thick rounded-full p-1 shadow-neo-sm md:shadow-neo h-[36px] sm:h-[40px] md:h-[52px]">
               <button 
                 onClick={() => { setDirection(0); setView('month'); }}
                 className={cn(
                   "h-full px-3 sm:px-4 lg:px-8 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
-                  view === 'month' ? "bg-primary text-white border-[2px] border-ink shadow-[2px_2px_0px_#1A1A1A]" : "text-ink hover:bg-bg-light"
+                  view === 'month' ? "bg-primary text-white border-[2px] border-ink shadow-neo-sm" : "text-ink hover:bg-bg-light"
                 )}
               >
                 {t('app.month')}
@@ -645,7 +589,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                 onClick={() => { setDirection(0); setView('week'); }}
                 className={cn(
                   "h-full px-3 sm:px-4 lg:px-8 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
-                  view === 'week' ? "bg-primary text-white border-[2px] border-ink shadow-[2px_2px_0px_#1A1A1A]" : "text-ink hover:bg-bg-light"
+                  view === 'week' ? "bg-primary text-white border-[2px] border-ink shadow-neo-sm" : "text-ink hover:bg-bg-light"
                 )}
               >
                 {t('app.week')}
@@ -655,46 +599,52 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
             {/* Mobile View Switcher */}
             <button
               onClick={() => { setDirection(0); setView(view === 'month' ? 'week' : 'month'); }}
-              className="sm:hidden flex items-center justify-center px-2.5 h-8 rounded-full border-[2px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] font-bold text-xs uppercase"
+              className="sm:hidden flex items-center justify-center px-2.5 h-8 rounded-full border-[2px] border-ink bg-surface shadow-neo-sm font-bold text-xs uppercase"
             >
               {view === 'month' ? t('app.m') : t('app.w')}
             </button>
 
             {userRole !== 'child' && (
-              <button 
+              <button
                 onClick={() => setIsSyncModalOpen(true)}
                 title={t('app.syncGoogleCalendar')}
-                className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+                aria-label={t('app.syncGoogleCalendar')}
+                className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
               >
                 <RefreshCw className="w-4 h-4 md:w-7 md:h-7 font-bold text-ink" strokeWidth={3} />
               </button>
             )}
             {userRole !== 'child' && (
               <>
-                <button 
+                <button
                   onClick={() => {
                     exportEventsToICS(events, familyMembersState);
                     showToast(t('app.calendarExported'));
                   }}
                   title={t('app.exportCalendar')}
-                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+                  aria-label={t('app.exportCalendar')}
+                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
                 >
                   <Download className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
                 </button>
-                <button 
+                <button
                   onClick={() => window.print()}
                   title={t('app.printCalendar', 'Print Calendar')}
-                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
+                  aria-label={t('app.printCalendar', 'Print Calendar')}
+                  className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
                 >
                   <Printer className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     setIsMultiSelectMode(!isMultiSelectMode);
                     if (isMultiSelectMode) setSelectedEventIdsForDelete([]);
                   }}
+                  title={isMultiSelectMode ? t('app.cancelMultiSelect') : t('app.startMultiSelect')}
+                  aria-label={isMultiSelectMode ? t('app.cancelMultiSelect') : t('app.startMultiSelect')}
+                  aria-pressed={isMultiSelectMode}
                   className={cn(
-                    "flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all",
+                    "flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all",
                     isMultiSelectMode ? "bg-primary text-white" : "bg-surface"
                   )}
                 >
@@ -702,10 +652,20 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                 </button>
               </>
             )}
-            <button onClick={prev} className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all">
+            <button
+              onClick={prev}
+              title={t('app.previous')}
+              aria-label={t('app.previous')}
+              className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all"
+            >
               <ChevronLeft className="w-4 h-4 md:w-8 md:h-8 font-bold" strokeWidth={3} />
             </button>
-            <button onClick={next} className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-[2px_2px_0px_#1A1A1A] md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all">
+            <button
+              onClick={next}
+              title={t('app.next')}
+              aria-label={t('app.next')}
+              className="flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all"
+            >
               <ChevronRight className="w-4 h-4 md:w-8 md:h-8 font-bold" strokeWidth={3} />
             </button>
           </div>
@@ -714,14 +674,14 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         <div className="flex flex-1 overflow-hidden relative">
           <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} onSignOut={handleSignOut} />
           
-          <main className="flex-1 flex flex-col relative bg-[#fcffe4] p-2 overflow-hidden">
+          <main className="flex-1 flex flex-col relative bg-bg-app p-2 overflow-hidden">
              {authLoading ? (
                <div className="flex-1 flex items-center justify-center">
                  <div className="animate-spin w-12 h-12 border-[4px] border-ink border-t-transparent rounded-full" />
                </div>
              ) : !user ? (
-               <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#fcffe4]/90 backdrop-blur-md">
-                  <div className="p-8 bg-surface border-[4px] border-ink shadow-[8px_8px_0px_#1A1A1A] rounded-3xl flex flex-col items-center max-w-sm w-full mx-4">
+               <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg-app/90 backdrop-blur-md">
+                  <div className="p-8 bg-surface border-[4px] border-ink shadow-neo-xl rounded-3xl flex flex-col items-center max-w-sm w-full mx-4">
                     <div className="w-20 h-20 bg-mem-2 rounded-full border-[3px] border-ink flex items-center justify-center shadow-neo mb-6">
                       <InteractiveLogo />
                     </div>
@@ -768,12 +728,12 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                         className="w-full h-12 px-4 rounded-xl border-[3px] border-ink font-bold bg-white/80 focus:outline-none focus:ring-2 focus:ring-primary text-ink placeholder:text-ink/40"
                       />
                       {authError && (
-                        <p className="text-[#FF5722] font-bold text-sm text-center">{authError}</p>
+                        <p className="text-danger font-bold text-sm text-center">{authError}</p>
                       )}
                       <button
                         type="submit"
                         disabled={authSubmitting}
-                        className="bg-primary w-full text-white font-black text-base px-8 py-3.5 rounded-xl border-[3px] border-ink hover:-translate-y-1 hover:shadow-neo transition-all shadow-[4px_4px_0px_#1A1A1A] active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0"
+                        className="bg-primary w-full text-white font-black text-base px-8 py-3.5 rounded-xl border-[3px] border-ink hover:-translate-y-1 hover:shadow-neo transition-all shadow-neo active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0"
                       >
                         {authSubmitting ? '...' : authMode === 'signin' ? t('app.signIn', 'Sign in') : t('app.createAccount', 'Create account')}
                       </button>
@@ -799,10 +759,14 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                           if (error) throw error;
                         } catch (err) {
                           console.error("Supabase OAuth failed. Falling back to local mode.", err);
-                          setUser({ uid: 'local-user', email: 'local@example.com' });
+                          // Force local-mode fallback by reloading — the auth
+                          // hook will resolve to `local-user` when Supabase
+                          // env vars are missing on next mount.
+                          showToast(t('app.continueOffline', 'Continuing offline'));
+                          window.location.reload();
                         }
                       })}
-                      className="w-full h-11 rounded-xl border-[3px] border-ink font-bold text-sm bg-white hover:-translate-y-0.5 hover:shadow-[2px_2px_0px_#1A1A1A] transition-all flex items-center justify-center gap-2 text-ink"
+                      className="w-full h-11 rounded-xl border-[3px] border-ink font-bold text-sm bg-surface hover:-translate-y-0.5 hover:shadow-neo-sm transition-all flex items-center justify-center gap-2 text-ink"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -821,9 +785,9 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
                <motion.div 
                  key={view + currentDate.toISOString()}
                  custom={direction}
-                 initial={(dir) => ({ opacity: 0, x: dir * 30 })}
+                 initial={{ opacity: 0, x: direction * 30 }}
                  animate={{ opacity: authLoading || !user ? 0 : 1, x: 0 }}
-                 exit={(dir) => ({ opacity: 0, x: -dir * 30 })}
+                 exit={{ opacity: 0, x: -direction * 30 }}
                  transition={{ duration: 0.3, ease: 'easeOut' }}
                  className="h-full flex flex-col"
                >
@@ -838,9 +802,11 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
              </AnimatePresence>
           
             {userRole !== 'child' && (
-              <button 
+              <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="absolute bottom-6 right-6 w-16 h-16 md:bottom-10 md:right-10 md:w-24 md:h-24 bg-primary rounded-full border-[3px] md:border-[5px] border-ink shadow-[4px_4px_0px_#1A1A1A] md:shadow-[6px_6px_0px_#1A1A1A] flex items-center justify-center cursor-pointer z-40 group tracking-widest active:translate-y-1"
+                aria-label={t('app.addEvent', 'Add event')}
+                title={t('app.addEvent', 'Add event')}
+                className="absolute bottom-6 right-6 w-16 h-16 md:bottom-10 md:right-10 md:w-24 md:h-24 bg-primary rounded-full border-[3px] md:border-[5px] border-ink shadow-neo md:shadow-neo-lg flex items-center justify-center cursor-pointer z-40 group tracking-widest active:translate-y-1"
               >
                 <Plus className="w-8 h-8 md:w-14 md:h-14 text-ink font-bold group-hover:rotate-90 transition-transform duration-300" strokeWidth={4} />
               </button>
@@ -848,15 +814,21 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
           </main>
         </div>
         
-        <AddEventModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-        <EventDetailModal 
-          isOpen={!!selectedEventId} 
-          onClose={() => setSelectedEventId(null)} 
-          eventId={selectedEventId!} 
-        />
+        <ErrorBoundary label="AddEvent">
+          <AddEventModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+        </ErrorBoundary>
+        <ErrorBoundary label="EventDetail">
+          <EventDetailModal
+            isOpen={!!selectedEventId}
+            onClose={() => setSelectedEventId(null)}
+            eventId={selectedEventId!}
+          />
+        </ErrorBoundary>
         <AnimatePresence>
           {selectedDay && (
-            <DayEventsModal isOpen={!!selectedDay} date={selectedDay} onClose={() => setSelectedDay(null)} />
+            <ErrorBoundary label="DayEvents">
+              <DayEventsModal isOpen={!!selectedDay} date={selectedDay} onClose={() => setSelectedDay(null)} />
+            </ErrorBoundary>
           )}
         </AnimatePresence>
 
@@ -870,7 +842,7 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
             >
               <button 
                 onClick={triggerBulkDelete}
-                className="bg-[#FF5722] text-white px-8 py-4 rounded-full border-[4px] border-ink font-bold shadow-[6px_6px_0px_#1A1A1A] hover:translate-y-[-4px] hover:shadow-[10px_10px_0px_#1A1A1A] active:translate-y-[2px] active:shadow-[2px_2px_0px_#1A1A1A] transition-all flex items-center gap-2 text-lg"
+                className="bg-danger text-white px-8 py-4 rounded-full border-[4px] border-ink font-bold shadow-neo-lg hover:translate-y-[-4px] hover:shadow-[10px_10px_0px_var(--color-ink)] active:translate-y-[2px] active:shadow-neo-sm transition-all flex items-center gap-2 text-lg"
               >
                 <Trash2 className="w-6 h-6" /> {t('app.deleteSelected', { count: selectedEventIdsForDelete.length })}
               </button>
@@ -881,102 +853,92 @@ export default function App({ timeZone = 'Europe/Paris' }: AppProps) {
         {/* Reminder Alert System */}
         <ReminderSystem />
 
-        {/* Global Toast */}
-        <AnimatePresence>
-          {toastMessage && (
-            <motion.div 
-              initial={{ opacity: 0, y: -50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -50 }}
-              className="fixed top-6 left-1/2 -translate-x-1/2 z-[300] bg-surface border-[3px] border-ink rounded-full px-6 py-3 shadow-neo flex items-center gap-3 font-bold text-ink"
-            >
-              <BellRing className="w-5 h-5 text-primary" strokeWidth={3} />
-              {toastMessage}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Global Toasts */}
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[300] flex flex-col items-center gap-2 pointer-events-none">
+          <AnimatePresence>
+            {toasts.map((t) => (
+              <motion.div
+                key={t.id}
+                initial={{ opacity: 0, y: -50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -50 }}
+                onClick={() => dismissToast(t.id)}
+                className="cursor-pointer pointer-events-auto bg-surface border-[3px] border-ink rounded-full px-6 py-3 shadow-neo flex items-center gap-3 font-bold text-ink"
+              >
+                <BellRing className="w-5 h-5 text-primary" strokeWidth={3} />
+                {t.message}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
 
         {/* Delete Confirmation Modal */}
-        <AnimatePresence>
-          {eventsToDelete && (
-            <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-                onClick={() => setEventsToDelete(null)}
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="relative bg-surface border-[4px] border-ink rounded-3xl p-6 lg:p-8 max-w-sm w-full text-center shadow-[8px_8px_0px_#1A1A1A]"
-              >
-                <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
-                  <AlertCircle className="w-8 h-8 text-ink" />
-                </div>
-                <h2 className="text-2xl font-display font-bold mb-2">{eventsToDelete.length > 1 ? t('app.deleteEventsTitle') : t('app.deleteEventTitle')}</h2>
-                <p className="text-ink/70 font-bold mb-6">{eventsToDelete.length > 1 ? t('app.deleteEventsConfirm', { count: eventsToDelete.length }) : t('app.deleteEventConfirm')}</p>
-                <div className="flex gap-4">
-                  <button 
-                    onClick={() => setEventsToDelete(null)}
-                    className="flex-1 h-12 bg-gray-200 rounded-full border-[3px] border-ink font-bold hover:-translate-y-1 hover:shadow-neo transition-all"
-                  >
-                    {t('app.cancel')}
-                  </button>
-                  <button 
-                    onClick={confirmDelete}
-                    className="flex-1 h-12 bg-[#FF5722] text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"
-                  >
-                    {t('app.delete')}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-        <AnimatePresence>
-          {isSyncModalOpen && (
-            <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
-                onClick={() => !isSyncing && setIsSyncModalOpen(false)}
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="relative bg-surface border-[4px] border-ink rounded-3xl p-6 lg:p-8 max-w-sm w-full text-center shadow-[8px_8px_0px_#1A1A1A]"
-              >
-                <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
-                  <RefreshCw className={cn("w-8 h-8 text-ink", isSyncing && "animate-spin")} />
-                </div>
-                <h2 className="text-2xl font-display font-bold mb-2">{t('app.syncConfirmTitle')}</h2>
-                <p className="text-ink/70 font-bold mb-6">{t('app.syncConfirmMessage', { count: events.length })}</p>
-                <div className="flex gap-4">
-                  <button 
-                    disabled={isSyncing}
-                    onClick={() => setIsSyncModalOpen(false)}
-                    className="flex-1 h-12 bg-gray-200 rounded-full border-[3px] border-ink font-bold hover:-translate-y-1 hover:shadow-neo transition-all disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-none"
-                  >
-                    {t('app.cancel')}
-                  </button>
-                  <button 
-                    disabled={isSyncing}
-                    onClick={triggerGoogleSync}
-                    className="flex-1 h-12 bg-primary text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-neo"
-                  >
-                    {isSyncing ? t('app.syncing') : t('app.confirm')}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
+        <ErrorBoundary label="DeleteConfirm">
+        <ModalShell
+          isOpen={!!eventsToDelete}
+          onClose={() => setEventsToDelete(null)}
+          maxWidth="max-w-sm"
+          className="text-center"
+        >
+          <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
+            <AlertCircle className="w-8 h-8 text-ink" />
+          </div>
+          <h2 className="text-2xl font-display font-bold mb-2">
+            {(eventsToDelete?.length ?? 0) > 1 ? t('app.deleteEventsTitle') : t('app.deleteEventTitle')}
+          </h2>
+          <p className="text-ink/70 font-bold mb-6">
+            {(eventsToDelete?.length ?? 0) > 1
+              ? t('app.deleteEventsConfirm', { count: eventsToDelete!.length })
+              : t('app.deleteEventConfirm')}
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setEventsToDelete(null)}
+              className="flex-1 h-12 bg-gray-200 rounded-full border-[3px] border-ink font-bold hover:-translate-y-1 hover:shadow-neo transition-all"
+            >
+              {t('app.cancel')}
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="flex-1 h-12 bg-danger text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"
+            >
+              {t('app.delete')}
+            </button>
+          </div>
+        </ModalShell>
+        </ErrorBoundary>
+
+        {/* Sync Confirmation Modal */}
+        <ErrorBoundary label="SyncConfirm">
+        <ModalShell
+          isOpen={isSyncModalOpen}
+          onClose={() => !isSyncing && setIsSyncModalOpen(false)}
+          maxWidth="max-w-sm"
+          className="text-center"
+        >
+          <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
+            <RefreshCw className={cn('w-8 h-8 text-ink', isSyncing && 'animate-spin')} />
+          </div>
+          <h2 className="text-2xl font-display font-bold mb-2">{t('app.syncConfirmTitle')}</h2>
+          <p className="text-ink/70 font-bold mb-6">{t('app.syncConfirmMessage', { count: events.length })}</p>
+          <div className="flex gap-4">
+            <button
+              disabled={isSyncing}
+              onClick={() => setIsSyncModalOpen(false)}
+              className="flex-1 h-12 bg-gray-200 rounded-full border-[3px] border-ink font-bold hover:-translate-y-1 hover:shadow-neo transition-all disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-none"
+            >
+              {t('app.cancel')}
+            </button>
+            <button
+              disabled={isSyncing}
+              onClick={triggerGoogleSync}
+              className="flex-1 h-12 bg-primary text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-neo"
+            >
+              {isSyncing ? t('app.syncing') : t('app.confirm')}
+            </button>
+          </div>
+        </ModalShell>
+        </ErrorBoundary>
       </div>
     </EventsContext.Provider>
   );

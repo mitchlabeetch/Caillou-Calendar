@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
-import { Settings, LogOut, CheckCircle2, ChevronRight, Home, GraduationCap, Shield, MapPin, Menu, Edit2, X, Briefcase, Dumbbell, Car, Plane, Coffee, Users, Building, Heart, Star, Cloud, Sun, Moon, Plus, Trash, Image as ImageIcon } from 'lucide-react';
+import { Settings, LogOut, CheckCircle2, ChevronRight, Home, GraduationCap, Shield, MapPin, Menu, Edit2, X, Briefcase, Dumbbell, Car, Plane, Coffee, Users, Building, Heart, Star, Cloud, Sun, Moon, Trash, Image as ImageIcon } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { SetStatusModal } from './SetStatusModal';
 import { SettingsModal } from './SettingsModal';
 import { FamilyModal } from './FamilyModal';
 import { PlacesModal } from './PlacesModal';
-import { isToday, isValid, parseISO, format, formatDistanceToNow } from 'date-fns';
+import { ErrorBoundary } from './ErrorBoundary';
+import { isToday, isValid, parseISO, formatDistanceToNow } from 'date-fns';
 
 const STATIC_ICONS: Record<string, any> = {
   Home, GraduationCap, Shield, Briefcase, Dumbbell, Car, Plane, MapPin, Coffee, Users, Building, Heart, Star, Cloud, Sun, Moon
@@ -30,7 +31,7 @@ function SidebarTooltip({ children, text, disabled }: { children: React.ReactNod
 
 export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOnMobile?: boolean; onCloseMobile?: () => void; onSignOut?: () => void }) {
   const { t } = useTranslation();
-  const { events, selectedMembers, toggleMember, familyMembers, updateFamilyMember, setEvents, reorderFamilyMembers, deleteFamilyMember } = useEvents();
+  const { events, selectedMembers, toggleMember, familyMembers, updateFamilyMember, reorderFamilyMembers, deleteFamilyMember } = useEvents();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFamilyOpen, setIsFamilyOpen] = useState(false);
@@ -54,6 +55,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
         document.removeEventListener('contextmenu', handleGlobalClick);
       };
     }
+    return undefined;
   }, [contextMenu]);
 
   useEffect(() => {
@@ -83,13 +85,15 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
 
   return (
     <>
-      <SetStatusModal 
-        isOpen={!!statusModalMemberId} 
-        onClose={() => setStatusModalMemberId(null)}
-        memberId={statusModalMemberId}
-        currentStatus={statusModalMemberId ? familyMembers.find(m => m.id === statusModalMemberId)?.currentLocation : undefined}
-        onSave={(id, status) => updateFamilyMember(id, { currentLocation: status })}
-      />
+      <ErrorBoundary label="SetStatus">
+        <SetStatusModal
+          isOpen={!!statusModalMemberId}
+          onClose={() => setStatusModalMemberId(null)}
+          memberId={statusModalMemberId}
+          currentStatus={statusModalMemberId ? familyMembers.find(m => m.id === statusModalMemberId)?.currentLocation : undefined}
+          onSave={(id, status) => updateFamilyMember(id, { currentLocation: status })}
+        />
+      </ErrorBoundary>
       
       {/* Mobile Overlay */}
       <AnimatePresence>
@@ -114,9 +118,12 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
           isCollapsed ? "px-2 items-center" : "px-6"
         )}
       >
-        <motion.button 
+        <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsCollapsed(!isCollapsed)}
+          title={isCollapsed ? t('app.openSidebar', 'Open sidebar') : t('app.closeSidebar', 'Close sidebar')}
+          aria-label={isCollapsed ? t('app.openSidebar', 'Open sidebar') : t('app.closeSidebar', 'Close sidebar')}
+          aria-expanded={!isCollapsed}
           className={cn(
             "w-10 h-10 rounded-full border-[3px] border-ink flex items-center justify-center shrink-0 shadow-neo hover:bg-ink hover:text-white transition-all",
             isCollapsed ? "self-center" : "self-end"
@@ -369,25 +376,25 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
             <div className="flex flex-col gap-2 pt-6 border-t-[3px] border-ink">
               <div className="grid grid-cols-2 gap-2">
                 <SidebarTooltip text={t('app.appSettings')} disabled={true}>
-                  <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
+                  <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <Settings className="w-4 h-4 shrink-0 text-[#5e5e5e] group-hover:text-[#5e5e5e] transition-colors group-hover:rotate-45" />
                     <span className="text-xs font-bold truncate text-[#5E5E5E]">{t('app.settings')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.manageFamily')} disabled={true}>
-                  <button onClick={() => setIsFamilyOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
+                  <button onClick={() => setIsFamilyOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <Users className="w-4 h-4 shrink-0 text-ink/70 group-hover:text-ink transition-colors group-hover:scale-110" />
                     <span className="text-xs font-bold truncate text-[#5e5e5e]">{t('app.family')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.manageLocations')} disabled={true}>
-                  <button onClick={() => setIsPlacesOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
+                  <button onClick={() => setIsPlacesOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <MapPin className="w-4 h-4 shrink-0 text-ink/70 group-hover:text-ink transition-colors group-hover:-translate-y-0.5" />
                     <span className="text-xs font-bold truncate border-[#5e5e5e] text-[#5e5e5e]">{t('app.places')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.logout')} disabled={true}>
-                  <button onClick={() => onSignOut?.()} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-[2px_2px_0px_#1A1A1A] hover:bg-red-50 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
+                  <button onClick={() => onSignOut?.()} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-red-50 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <LogOut className="w-4 h-4 shrink-0 text-red-500/70 group-hover:text-red-600 transition-colors group-hover:-translate-x-1" />
                     <span className="text-xs font-bold truncate text-red-600">{t('app.logout')}</span>
                   </button>
@@ -397,9 +404,15 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
           )}
         </div>
       </motion.aside>
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      <FamilyModal isOpen={isFamilyOpen} onClose={() => setIsFamilyOpen(false)} />
-      <PlacesModal isOpen={isPlacesOpen} onClose={() => setIsPlacesOpen(false)} />
+      <ErrorBoundary label="Settings">
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      </ErrorBoundary>
+      <ErrorBoundary label="Family">
+        <FamilyModal isOpen={isFamilyOpen} onClose={() => setIsFamilyOpen(false)} />
+      </ErrorBoundary>
+      <ErrorBoundary label="Places">
+        <PlacesModal isOpen={isPlacesOpen} onClose={() => setIsPlacesOpen(false)} />
+      </ErrorBoundary>
       
       <AnimatePresence>
         {contextMenu && (
@@ -409,7 +422,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             style={{ top: Math.min(contextMenu.y, typeof window !== 'undefined' ? window.innerHeight - 200 : contextMenu.y), left: Math.min(contextMenu.x, typeof window !== 'undefined' ? window.innerWidth - (contextMenu.isIconPickerOpen ? 250 : 200) : contextMenu.x) }}
-            className={cn("fixed z-[9999] bg-surface border-[3px] border-ink shadow-[4px_4px_0px_#1A1A1A] rounded-xl overflow-hidden py-1", contextMenu.isIconPickerOpen ? "w-[240px]" : "w-48")}
+            className={cn("fixed z-[9999] bg-surface border-[3px] border-ink shadow-neo rounded-xl overflow-hidden py-1", contextMenu.isIconPickerOpen ? "w-[240px]" : "w-48")}
             onClick={(e) => e.stopPropagation()}
             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
           >
@@ -489,7 +502,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-surface p-6 rounded-2xl w-full max-w-sm border-[3px] border-ink shadow-[8px_8px_0px_#1A1A1A]"
+              className="bg-surface p-6 rounded-2xl w-full max-w-sm border-[3px] border-ink shadow-neo-xl"
             >
               <h2 className="text-2xl font-display font-bold mb-2">{t('app.removeMember', 'Remove Member?')}</h2>
               <p className="text-ink/70 font-bold mb-6">
@@ -507,7 +520,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
                     deleteFamilyMember(deleteConfirmMemberId);
                     setDeleteConfirmMemberId(null);
                   }}
-                  className="flex-1 h-12 bg-[#FF5722] text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"
+                  className="flex-1 h-12 bg-danger text-white rounded-full border-[3px] border-ink font-bold shadow-neo hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"
                 >
                   {t('app.remove', 'Remove')}
                 </button>

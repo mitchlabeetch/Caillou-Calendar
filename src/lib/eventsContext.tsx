@@ -33,6 +33,8 @@ export interface EventsContextType {
   triggerDropAnimation: (id: string) => void;
 
   userRole: UserRole;
+  /** Current authenticated user, or `null` if signed out. Used by RBAC. */
+  user: { uid: string; email: string } | null;
 }
 
 export const EventsContext = createContext<EventsContextType | null>(null);

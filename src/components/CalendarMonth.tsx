@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { format, startOfMonth, startOfWeek, endOfMonth, endOfWeek, eachDayOfInterval, isSameMonth, isToday, parseISO, isSameDay, isValid } from 'date-fns';
 import { cn } from '../lib/utils';
 import { CalendarEvent, FamilyMember } from '../types';
 import { useEvents } from '../lib/eventsContext';
-import { X, Clock, Repeat, BellRing, CheckSquare, GripVertical, Gift } from 'lucide-react';
+import { X, Repeat, BellRing, CheckSquare, GripVertical, Gift } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -27,40 +27,50 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
   const [quickAddTitle, setQuickAddTitle] = useState('');
   const clickTimeoutRef = React.useRef<any>(null);
 
-  const getDayEvents = (day: Date) => {
-    const dayStr = format(day, 'yyyy-MM-dd');
-    return events.filter(e => {
-      if (!e || !e.date || !isValid(parseISO(e.date))) return false;
-      if (!e.memberIds || !Array.isArray(e.memberIds) || !e.memberIds.some(id => selectedMembers.includes(id))) return false;
+  // Memoised event lookup keyed by `YYYY-MM-DD`. Recurrence expansion is
+  // expensive; recomputing it for every cell on every render is wasteful.
+  // Recomputes only when events or the member filter change.
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    const visibleMembers = new Set(selectedMembers);
+
+    const matchesDay = (e: CalendarEvent, dayStr: string, day: Date): boolean => {
+      if (!e.date || !isValid(parseISO(e.date))) return false;
       if (e.exceptionDates?.includes(dayStr)) return false;
-      
+      if (!e.memberIds || !Array.isArray(e.memberIds)) return false;
+      if (!e.memberIds.some(id => visibleMembers.has(id))) return false;
       const eDate = parseISO(e.date);
-      
       if (e.isBirthday || e.recurrence?.type === 'yearly') {
         return eDate.getMonth() === day.getMonth() && eDate.getDate() === day.getDate() && dayStr >= e.date;
       }
-
       if (e.recurrence?.type === 'monthly') {
         return eDate.getDate() === day.getDate() && dayStr >= e.date;
       }
-      
       if (e.recurrence?.type === 'weekly') {
         return eDate.getDay() === day.getDay() && dayStr >= e.date;
       }
-
       if (e.recurrence?.type === 'daily') {
         return dayStr >= e.date;
       }
-      
       if (e.endDate && isValid(parseISO(e.endDate))) {
         return dayStr >= e.date && dayStr <= e.endDate;
       }
       return e.date === dayStr;
-    });
+    };
+
+    for (const day of days) {
+      const dayStr = format(day, 'yyyy-MM-dd');
+      map.set(dayStr, events.filter(e => matchesDay(e, dayStr, day)));
+    }
+    return map;
+  }, [events, selectedMembers, days]);
+
+  const getDayEvents = (day: Date): CalendarEvent[] => {
+    return eventsByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
   };
 
   return (
-    <main className="flex-1 flex flex-col relative bg-[#fcffe4] p-2 h-full min-h-0 overflow-hidden">
+    <main className="flex-1 flex flex-col relative bg-bg-app p-2 h-full min-h-0 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden">
         <div className="grid grid-cols-7 mb-1 sm:mb-2 shrink-0 min-w-[500px] md:min-w-[700px]">
           {(t('app.daysShort', { returnObjects: true }) as string[]).map((d) => (
@@ -71,7 +81,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
         </div>
         
         <div className="flex-1 grid grid-cols-7 pb-6 overflow-y-auto overflow-x-hidden min-w-[500px] md:min-w-[700px]">
-        {days.map((day, i) => {
+        {days.map((day) => {
           const formattedDate = format(day, dateFormat);
           const isCurrentMonth = isSameMonth(day, monthStart);
           const isTodayDate = isToday(day);
@@ -131,7 +141,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
             >
               <div className={cn("flex justify-end mb-1")}>
                 {isTodayDate ? (
-                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-mem-3 border-[2px] sm:border-[3px] border-ink rounded-full flex items-center justify-center font-bold text-sm sm:text-xl shadow-[2px_2px_0px_#1A1A1A] sm:shadow-[3px_3px_0px_#1A1A1A]">
+                  <div className="w-7 h-7 sm:w-10 sm:h-10 bg-mem-3 border-[2px] sm:border-[3px] border-ink rounded-full flex items-center justify-center font-bold text-sm sm:text-xl shadow-neo-sm sm:shadow-neo-md">
                     {formattedDate}
                   </div>
                 ) : (
@@ -149,7 +159,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
               
               {quickAddDay && quickAddDay.getTime() === day.getTime() && (
                   <div
-                    className="absolute z-50 bg-surface border-[2px] sm:border-[3px] border-primary rounded-lg sm:rounded-xl shadow-[4px_4px_0px_#1A1A1A] p-2 flex flex-col justify-center animate-in zoom-in-95 duration-200"
+                    className="absolute z-50 bg-surface border-[2px] sm:border-[3px] border-primary rounded-lg sm:rounded-xl shadow-neo p-2 flex flex-col justify-center animate-in zoom-in-95 duration-200"
                     style={{ 
                       top: '50%',
                       left: '50%',
@@ -258,7 +268,7 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
             setSelectedEventId(event.id); 
           }
         }}
-        className={cn(`h-[70px] sm:h-[100px] w-full border-[2px] sm:border-[3px] p-1 sm:p-1.5 flex flex-col gap-1 shadow-[2px_2px_0px_#1A1A1A] sm:shadow-[4px_4px_0px_#1A1A1A] transition-all cursor-pointer relative group pill-hover-effect mt-1`, 
+        className={cn(`h-[70px] sm:h-[100px] w-full border-[2px] sm:border-[3px] p-1 sm:p-1.5 flex flex-col gap-1 shadow-neo-sm sm:shadow-neo transition-all cursor-pointer relative group pill-hover-effect mt-1`, 
           spanClass,
           members[0]?.bgClass || "bg-mem-3",
           isSelected ? "border-primary opacity-90 scale-95" : "border-ink",
@@ -320,7 +330,7 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
         }
       }}
       className={cn(
-        "h-[36px] w-full border-[3px] px-4 flex justify-between items-center shadow-[3px_3px_0px_#1A1A1A] transition-all cursor-pointer relative group pill-hover-effect overflow-visible z-10",
+        "h-[36px] w-full border-[3px] px-4 flex justify-between items-center shadow-neo-md transition-all cursor-pointer relative group pill-hover-effect overflow-visible z-10",
         spanClassNonThumb,
         members.length === 1 ? members[0].bgClass : "bg-bg-light",
         isSelected ? "border-primary opacity-90 scale-95" : "border-ink",

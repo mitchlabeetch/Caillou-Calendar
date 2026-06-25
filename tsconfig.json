@@ -22,7 +22,13 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "vitest/globals"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": false
   },
-  "exclude": ["supabase"]
+  "exclude": ["supabase", "caillou-code-wiki", "wiki", "audit-screenshots", "dist", "node_modules"]
 }

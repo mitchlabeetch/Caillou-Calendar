@@ -1,5 +1,4 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
+﻿import { useTranslation } from 'react-i18next';
 import { Clock, MapPin, Repeat, BellRing, Gift } from 'lucide-react';
 import { CalendarEvent } from '../types';
 import { cn } from '../lib/utils';
@@ -12,7 +11,7 @@ export function EventHoverCard({ event }: { event: CalendarEvent }) {
 
   return (
     <div 
-      className="absolute hidden group-hover:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-surface text-ink border-[3px] border-ink rounded-2xl shadow-[4px_4px_0px_#1A1A1A] p-3 z-50 pointer-events-auto cursor-default"
+      className="absolute hidden group-hover:flex flex-col bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-surface text-ink border-[3px] border-ink rounded-2xl shadow-neo p-3 z-50 pointer-events-auto cursor-default"
       onClick={(e) => e.stopPropagation()}
     >
       <div 

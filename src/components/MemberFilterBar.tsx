@@ -1,5 +1,4 @@
-import React from 'react';
-import { motion } from 'motion/react';
+﻿import { motion } from 'motion/react';
 import { useEvents } from '../lib/eventsContext';
 import { cn } from '../lib/utils';
 
@@ -7,7 +6,7 @@ export function MemberFilterBar() {
   const { familyMembers, selectedMembers, toggleMember } = useEvents();
 
   return (
-    <div className="sticky top-0 z-30 bg-[#fcffe4]/95 backdrop-blur-sm py-2 px-2 flex gap-2 overflow-x-auto shrink-0 border-b-2 border-ink/10">
+    <div className="sticky top-0 z-30 bg-bg-app/95 backdrop-blur-sm py-2 px-2 flex gap-2 overflow-x-auto shrink-0 border-b-2 border-ink/10">
       {familyMembers.map((member) => {
         const isSelected = selectedMembers.includes(member.id);
         return (

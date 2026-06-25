@@ -1,7 +1,6 @@
-import React from 'react';
-import { useTranslation } from 'react-i18next';
+﻿import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
-import { format, parseISO, isValid, isToday, isTomorrow, addDays, isSameDay } from 'date-fns';
+import { format, parseISO, isValid, isToday, isTomorrow } from 'date-fns';
 import { useEvents } from '../lib/eventsContext';
 import { cn } from '../lib/utils';
 import { getDateLocale } from '../lib/dateLocale';
@@ -18,7 +17,7 @@ function groupEventsByDate(events: CalendarEvent[]) {
   return groups;
 }
 
-export function CalendarAgenda({ currentDate, onDateClick }: { currentDate: Date; onDateClick?: (d: Date) => void }) {
+export function CalendarAgenda({ onDateClick }: { currentDate: Date; onDateClick?: (d: Date) => void }) {
   const { t, i18n } = useTranslation();
   const { events, selectedMembers, familyMembers, setSelectedEventId } = useEvents();
   const dateOptions = { locale: getDateLocale(i18n.language) };
@@ -40,7 +39,7 @@ export function CalendarAgenda({ currentDate, onDateClick }: { currentDate: Date
   };
 
   return (
-    <main className="flex-1 flex flex-col bg-[#fcffe4] p-3 overflow-y-auto">
+    <main className="flex-1 flex flex-col bg-bg-app p-3 overflow-y-auto">
       {sortedDates.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center opacity-80">
           <h4 className="text-xl font-display font-bold mb-2">{t('app.noEventsToday')}</h4>
@@ -88,7 +87,7 @@ export function CalendarAgenda({ currentDate, onDateClick }: { currentDate: Date
                         )}
                       </div>
                       {evt.location && (
-                        <span className="font-bold text-xs opacity-60">📍 {evt.location}</span>
+                        <span className="font-bold text-xs opacity-60">ðŸ“ {evt.location}</span>
                       )}
                       <div className="flex gap-1 mt-1">
                         {evt.memberIds.map(mid => {

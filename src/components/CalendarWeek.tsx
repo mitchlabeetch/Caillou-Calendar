@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../lib/dateLocale';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, addDays, parseISO, isSameDay, isValid, isToday } from 'date-fns';
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, parseISO, isSameDay, isValid, isToday } from 'date-fns';
 import { cn } from '../lib/utils';
 import { CalendarEvent } from '../types';
 import { useEvents } from '../lib/eventsContext';
-import { X, Clock, Repeat, BellRing, CheckSquare, GripVertical, Layers, Gift } from 'lucide-react';
+import { X, CheckSquare, GripVertical, Layers, Gift } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
 
 export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
@@ -27,49 +27,59 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
   const [resizingEvent, setResizingEvent] = useState<{ id: string, newEndMins: number } | null>(null);
   const [isMobile, setIsMobile] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const getDayEvents = (day: Date) => {
-    const dayStr = format(day, 'yyyy-MM-dd');
-    return events.filter(e => {
-      if (!e || !e.date || !isValid(parseISO(e.date))) return false;
-      if (!e.memberIds || !Array.isArray(e.memberIds) || !e.memberIds.some(id => selectedMembers.includes(id))) return false;
+  // Memoised timed-event lookup keyed by `YYYY-MM-DD`. Recurrence
+  // expansion is expensive; recomputing it for every cell on every render
+  // is wasteful. Recomputes only when events or the member filter change.
+  const eventsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
+    const visibleMembers = new Set(selectedMembers);
+
+    const matchesDay = (e: CalendarEvent, dayStr: string, day: Date): boolean => {
+      if (!e.date || !isValid(parseISO(e.date))) return false;
       if (!e.startTime || typeof e.startTime !== 'string') return false;
       if (e.exceptionDates?.includes(dayStr)) return false;
-      
+      if (!e.memberIds || !Array.isArray(e.memberIds)) return false;
+      if (!e.memberIds.some(id => visibleMembers.has(id))) return false;
       const eDate = parseISO(e.date);
-      
       if (e.isBirthday || e.recurrence?.type === 'yearly') {
         return eDate.getMonth() === day.getMonth() && eDate.getDate() === day.getDate() && dayStr >= e.date;
       }
-
       if (e.recurrence?.type === 'monthly') {
         return eDate.getDate() === day.getDate() && dayStr >= e.date;
       }
-      
       if (e.recurrence?.type === 'weekly') {
         return eDate.getDay() === day.getDay() && dayStr >= e.date;
       }
-
       if (e.recurrence?.type === 'daily') {
         return dayStr >= e.date;
       }
-      
       if (e.endDate && isValid(parseISO(e.endDate))) {
         return dayStr >= e.date && dayStr <= e.endDate;
       }
       return e.date === dayStr;
-    });
+    };
+
+    for (const day of days) {
+      const dayStr = format(day, 'yyyy-MM-dd');
+      map.set(dayStr, events.filter(e => matchesDay(e, dayStr, day)));
+    }
+    return map;
+  }, [events, selectedMembers, days]);
+
+  const getDayEvents = (day: Date): CalendarEvent[] => {
+    return eventsByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
   };
 
   return (
-    <main className="flex-1 flex flex-col relative bg-[#fcffe4] p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden rounded-xl sm:rounded-3xl shadow-[2px_2px_0px_#1A1A1A] sm:shadow-[4px_4px_0px_#1A1A1A] border-[2px] sm:border-[4px] border-ink bg-surface relative">
+    <main className="flex-1 flex flex-col relative bg-bg-app p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden rounded-xl sm:rounded-3xl shadow-neo-sm sm:shadow-neo border-[2px] sm:border-[4px] border-ink bg-surface relative">
         <div className="flex flex-col h-full min-w-[500px] md:min-w-[700px]">
           <div className="grid grid-cols-[30px_repeat(7,1fr)] sm:grid-cols-8 border-b-[2px] sm:border-b-[4px] border-ink shrink-0 bg-surface rounded-t-xl sm:rounded-t-3xl">
             <div className="flex items-end justify-center pb-2 text-ink/50 text-[10px] sm:text-xs font-bold uppercase border-r-[2px] sm:border-r-[4px] border-ink pt-2 sm:pt-3">{t('app.time')}</div>
@@ -85,7 +95,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                 <span className="text-[10px] sm:text-xs font-black text-ink uppercase opacity-60">{format(day, 'EEE', dateOptions)}</span>
                 <span className={cn(
                   "text-sm sm:text-lg font-black w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full mt-0.5 sm:mt-1",
-                  isToday(day) ? "bg-primary text-white border-[2px] sm:border-[3px] border-ink shadow-[2px_2px_0px_#1A1A1A]" : ""
+                  isToday(day) ? "bg-primary text-white border-[2px] sm:border-[3px] border-ink shadow-neo-sm" : ""
                 )}>
                   {format(day, 'd')}
                 </span>
@@ -244,7 +254,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                              drag={isMobile && !isMultiSelectMode ? "x" : false}
                              dragConstraints={{ left: 0, right: 0 }}
                              dragElastic={0.8}
-                             onDragEnd={isMobile ? (e, info) => {
+                             onDragEnd={isMobile ? (_e, info) => {
                                if (info.offset.x < -80 || info.offset.x > 80) {
                                  deleteEvent(evt.id);
                                }
@@ -272,7 +282,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                                }
                              }}
                              className={cn(
-                               "absolute rounded-lg sm:rounded-xl border-[2px] sm:border-[3px] p-1 sm:p-2 shadow-[2px_2px_0px_#1A1A1A] sm:shadow-neo cursor-pointer transition-transform hover:scale-[1.02] hover:z-50 group overflow-visible flex flex-col items-start justify-start text-left",
+                               "absolute rounded-lg sm:rounded-xl border-[2px] sm:border-[3px] p-1 sm:p-2 shadow-neo-sm sm:shadow-neo cursor-pointer transition-transform hover:scale-[1.02] hover:z-50 group overflow-visible flex flex-col items-start justify-start text-left",
                                activeMem?.bgClass || "bg-surface text-ink",
                                isSelected ? "border-primary opacity-90 scale-95" : "border-ink",
                                evt.recurrence && evt.recurrence.type !== 'none' ? "border-dashed" : "border-solid"
@@ -355,7 +365,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                                     target.addEventListener('pointerup', handlePointerUp);
                                   }}
                                 >
-                                  <div className={cn("w-8 h-2.5 border-[2px] border-ink rounded-full shadow-[1px_1px_0px_#1A1A1A] flex items-center justify-center gap-[2px]", activeMem?.bgClass || "bg-surface")}>
+                                  <div className={cn("w-8 h-2.5 border-[2px] border-ink rounded-full shadow-neo-sm flex items-center justify-center gap-[2px]", activeMem?.bgClass || "bg-surface")}>
                                     <div className="w-[3px] h-[3px] bg-ink rounded-full opacity-60"></div>
                                     <div className="w-[3px] h-[3px] bg-ink rounded-full opacity-60"></div>
                                     <div className="w-[3px] h-[3px] bg-ink rounded-full opacity-60"></div>
@@ -383,7 +393,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                 
                 {quickAdd && quickAdd.day.getTime() === day.getTime() && (
                   <div
-                    className="absolute z-50 bg-[#fcffe4] border-[2px] sm:border-[3px] border-primary rounded-lg sm:rounded-xl shadow-[4px_4px_0px_#1A1A1A] p-2 flex flex-col justify-center animate-in zoom-in-95 duration-200"
+                    className="absolute z-50 bg-bg-app border-[2px] sm:border-[3px] border-primary rounded-lg sm:rounded-xl shadow-neo p-2 flex flex-col justify-center animate-in zoom-in-95 duration-200"
                     style={{ 
                       top: `${(quickAdd.hour - 7) * 60}px`, 
                       height: '60px',

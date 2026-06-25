@@ -1,30 +1,53 @@
 import { CalendarEvent, FamilyMember } from '../types';
+import { getActiveTimeZone } from './timezone';
 export function exportEventsToICS(events: CalendarEvent[], familyMembers: FamilyMember[]) {
+  const tz = getActiveTimeZone();
+  const escapeText = (text: string) => {
+    return text.replace(/[\\;,]/g, '\\$&').replace(/\n/g, '\\n');
+  };
+
+  /**
+   * Convert a wall-clock `(date, time)` to a UTC ICS datetime string.
+   * Previously this exported floating times (`...T090000`) which most
+   * calendar apps interpret as the *recipient's* local time, so a
+   * 9 AM event in Paris would become 9 AM in Sydney. We now emit UTC
+   * with a `Z` suffix, which is unambiguous.
+   */
+  const toUtc = (dateStr: string, timeStr: string): string => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hour, minute] = timeStr.split(':').map(Number);
+    // Build the wall-clock moment in the active timezone, then convert
+    // to UTC. We treat the wall clock as if it were UTC for arithmetic
+    // and accept a small offset — for family use this is the right
+    // trade-off vs. floating times.
+    const wall = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+    // Use the IANA offset for the active timezone at that wall moment
+    // to shift to true UTC.
+    try {
+      const utcDate = new Date(wall.toLocaleString('en-US', { timeZone: tz }));
+      const offsetMs = wall.getTime() - utcDate.getTime();
+      const utc = new Date(wall.getTime() + offsetMs);
+      return utc.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    } catch {
+      return wall.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    }
+  };
+
   const formatDateTime = (dateStr: string, timeStr?: string) => {
-    // dateStr is YYYY-MM-DD
-    // timeStr is HH:mm or undefined
     if (!timeStr) {
       // All day event, ICS format YYYYMMDD
       return dateStr.replace(/-/g, '');
     }
-    const [year, month, day] = dateStr.split('-');
-    const [hour, minute] = timeStr.split(':');
-    
-    // Naive local time export mapping to UTC without Z can be tricky, 
-    // but just treating it as floating time is usually acceptable for personal configs
-    return `${year}${month}${day}T${hour}${minute}00`;
-  };
-
-  const escapeText = (text: string) => {
-    return text.replace(/[\\;,]/g, '\\$&').replace(/\n/g, '\\n');
+    return toUtc(dateStr, timeStr);
   };
 
   let icsLines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//AI Studio Build//Family Calendar//EN',
+    'PRODID:-//Caillou//Family Calendar//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH'
+    'METHOD:PUBLISH',
+    `X-WR-TIMEZONE:${tz}`,
   ];
 
   for (const event of events) {
@@ -82,9 +105,6 @@ export function exportEventsToICS(events: CalendarEvent[], familyMembers: Family
   
   // Download logic
   const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8;' });
-  const link = document.createElement('url');
-  
-  // For standard HTML 5 download
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

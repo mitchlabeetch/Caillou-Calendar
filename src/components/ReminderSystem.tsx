@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useEvents } from '../lib/eventsContext';
 import { useTranslation } from 'react-i18next';
 import { CalendarEvent } from '../types';
-import { parseISO, subMinutes, subHours, subDays, isBefore, isAfter, subSeconds } from 'date-fns';
+import { parseISO, subMinutes, subHours, subDays, isBefore, isAfter } from 'date-fns';
 import { Bell, X, BellRing } from 'lucide-react';
 
 export function ReminderSystem() {
@@ -110,7 +110,7 @@ export function ReminderSystem() {
             initial={{ opacity: 0, x: 50, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 50, scale: 0.9 }}
-            className="bg-primary text-primary-foreground rounded-xl p-4 shadow-[6px_6px_0px_#1A1A1A] w-72 md:w-80 relative overflow-hidden print-hide cursor-pointer hover:scale-[1.02] transition-transform"
+            className="bg-primary text-white rounded-xl p-4 shadow-neo-lg w-72 md:w-80 relative overflow-hidden print-hide cursor-pointer hover:scale-[1.02] transition-transform"
             onClick={requestPermission}
           >
             <div className="flex items-center gap-3">
@@ -128,7 +128,7 @@ export function ReminderSystem() {
             initial={{ opacity: 0, x: 50, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 50, scale: 0.9 }}
-            className="bg-surface border-[3px] border-ink rounded-xl p-4 shadow-[6px_6px_0px_#1A1A1A] w-72 md:w-80 relative overflow-hidden print-hide"
+            className="bg-surface border-[3px] border-ink rounded-xl p-4 shadow-neo-lg w-72 md:w-80 relative overflow-hidden print-hide"
           >
             <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
             <div className="flex items-start justify-between gap-3">

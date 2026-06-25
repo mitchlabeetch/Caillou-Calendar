@@ -1,3 +1,4 @@
+import { format, addDays } from 'date-fns';
 import { CalendarEvent, FamilyMember, MemberLocation } from '../types';
 
 export const familyMembers: FamilyMember[] = [
@@ -14,110 +15,124 @@ export const todayLocations: MemberLocation[] = [
   { memberId: 'm4', locationName: 'MUNICH', icon: 'location_on' },
 ];
 
+/**
+ * Convert a day offset (0 = today, 1 = tomorrow, …) into a stable
+ * `YYYY-MM-DD` string in the local timezone.
+ */
+function dayOffset(offset: number): string {
+  return format(addDays(new Date(), offset), 'yyyy-MM-dd');
+}
+
+/**
+ * Mock events. Dates are computed relative to "today" so the seed
+ * calendar is never empty regardless of when the app is opened. The
+ * offsets below mirror the original October 2024 seed schedule but
+ * with the absolute anchor dropped.
+ */
 export const mockEvents: CalendarEvent[] = [
   {
     id: 'e1',
     title: 'Soccer Prac',
-    date: '2024-10-04',
+    date: dayOffset(3),
     startTime: '16:30',
     memberIds: ['m4'],
   },
   {
     id: 'e2',
     title: 'Tutor',
-    date: '2024-10-04',
+    date: dayOffset(3),
     startTime: '18:00',
     memberIds: ['m3'],
   },
   {
     id: 'e3',
     title: 'Dentist',
-    date: '2024-10-01',
+    date: dayOffset(0),
     startTime: '09:00',
     memberIds: ['m1'],
   },
   {
     id: 'e4',
     title: 'Board Mtg',
-    date: '2024-10-09',
+    date: dayOffset(8),
     startTime: '19:00',
     memberIds: ['m2'],
   },
   {
     id: 'e5',
     title: 'Game!',
-    date: '2024-10-12',
+    date: dayOffset(11),
     startTime: '14:00',
     memberIds: ['m4'],
   },
   {
     id: 'e6',
     title: 'Family Yoga',
-    date: '2024-10-14',
+    date: dayOffset(13),
     startTime: '08:00',
     memberIds: ['m1', 'm2', 'm3', 'm4'],
   },
   {
     id: 'e7',
     title: 'Dentist',
-    date: '2024-10-15',
+    date: dayOffset(14),
     startTime: '09:00',
     memberIds: ['m1'],
   },
   {
     id: 'e8',
     title: 'Golf',
-    date: '2024-10-15',
+    date: dayOffset(14),
     memberIds: ['m2'],
   },
   {
     id: 'e9',
     title: 'Tutor',
-    date: '2024-10-15',
+    date: dayOffset(14),
     memberIds: ['m3'],
   },
   {
     id: 'e10',
     title: 'Pizza Party! 🍕',
-    date: '2024-10-19',
+    date: dayOffset(18),
     memberIds: ['m4'],
   },
   {
     id: 'e11',
     title: 'Family Photo',
-    date: '2024-10-19',
+    date: dayOffset(18),
     memberIds: ['m1', 'm2', 'm3', 'm4'],
     thumbnailUrl: 'https://images.unsplash.com/photo-1740815897057-a93a8cf98a70?crop=entropy&cs=srgb&fm=jpg&q=85',
   },
   {
     id: 'e12',
     title: 'Family Camping Trip',
-    date: '2024-10-23',
+    date: dayOffset(22),
     memberIds: ['m1', 'm2', 'm3', 'm4'],
   },
   {
     id: 'e13',
     title: 'Project Due',
-    date: '2024-10-23',
+    date: dayOffset(22),
     memberIds: ['m1'],
   },
   {
     id: 'e14',
     title: 'Skate Park',
-    date: '2024-10-23',
+    date: dayOffset(22),
     memberIds: ['m4'],
   },
   {
     id: 'e15',
     title: 'Grandparents Visit',
-    date: '2024-10-24',
+    date: dayOffset(23),
     memberIds: ['m1', 'm2'], // using mixed gradient in mockup
   },
   {
     id: 'e16',
     title: 'Park Day Photo',
-    date: '2024-10-28',
+    date: dayOffset(27),
     memberIds: ['m1', 'm2', 'm3', 'm4'],
     thumbnailUrl: 'https://images.unsplash.com/photo-1740815897090-36484f31a51b?crop=entropy&cs=srgb&fm=jpg&q=85',
-  }
+  },
 ];

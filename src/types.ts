@@ -36,6 +36,12 @@ export type CalendarEvent = {
   isBirthday?: boolean;
   driverId?: string;
   exceptionDates?: string[]; // Dates to skip in a recurring pattern
+  /** Free-form notes / description (round-trips with Google Calendar's `description`). */
+  notes?: string;
+  /** Google Calendar event ID assigned when this event was pushed upstream. */
+  googleEventId?: string;
+  /** Last update timestamp (ISO 8601) used by two-way sync conflict resolution. */
+  updatedAt?: string;
 };
 
 export type MemberLocation = {

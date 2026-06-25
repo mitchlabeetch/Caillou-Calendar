@@ -158,12 +158,12 @@ export const flushOutboundSyncQueue = async () => {
 
       switch (item.operation) {
         case 'insert': {
-          await supabase.from(item.table).insert([{ ...item.payload, ownerId: userId }]);
+          await supabase.from(item.table).insert([{ ...item.payload, owner_id: userId }]);
           break;
         }
         case 'update': {
           const { id, ...rest } = item.payload;
-          await supabase.from(item.table).update({ ...rest, ownerId: userId }).eq('id', id);
+          await supabase.from(item.table).update({ ...rest, owner_id: userId }).eq('id', id);
           break;
         }
         case 'delete': {
