@@ -9,3 +9,7 @@ coverage/
 playwright-report/
 test-results/
 playwright/.cache/
+# One-off coverage scratch output (run-coverage.ps1 redirects here).
+cov*.txt
+# Puppeteer / audit screenshots produced during the production audit.
+audit-screenshots/

@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    name: lint · typecheck · build · test
+  unit-and-build:
+    name: lint · typecheck · build · unit · coverage
     runs-on: ubuntu-latest
     timeout-minutes: 12
 
@@ -50,3 +50,34 @@ jobs:
       - name: Audit dependencies
         run: npm audit --production --audit-level=high
         continue-on-error: true
+
+  visual-regression:
+    name: playwright · visual regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run visual regression suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
