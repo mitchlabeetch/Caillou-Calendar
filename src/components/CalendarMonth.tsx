@@ -5,7 +5,7 @@ import { format, startOfMonth, startOfWeek, endOfMonth, endOfWeek, eachDayOfInte
 import { cn } from '../lib/utils';
 import { CalendarEvent, FamilyMember } from '../types';
 import { useEvents } from '../lib/eventsContext';
-import { X, Repeat, BellRing, CheckSquare, GripVertical, Gift } from 'lucide-react';
+import { X, Repeat, BellRing, CheckSquare, GripVertical, Gift, Pin, CalendarDays } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -334,24 +334,36 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
         spanClassNonThumb,
         members.length === 1 ? members[0].bgClass : "bg-bg-light",
         isSelected ? "border-primary opacity-90 scale-95" : "border-ink",
-        event.recurrence && event.recurrence.type !== 'none' ? "border-dashed" : "border-solid"
+        event.recurrence && event.recurrence.type !== 'none' ? "border-dashed" : "border-solid",
+        event.allDay && "ring-2 ring-ink/30",
+        event.pinned && "ring-2 ring-primary",
+        event.category && `cat-${event.category}`
       )}
-      style={members.length > 1 ? { background: 'repeating-linear-gradient(45deg, #B39DDB, #B39DDB 10px, #80CBC4 10px, #80CBC4 20px, #FFAB91 20px, #FFAB91 30px, #F48FB1 30px, #F48FB1 40px)' } : {}}
-      onClick={(e) => { 
-        e.stopPropagation(); 
+      style={event.colorOverride ? { background: event.colorOverride, color: 'white' } : members.length > 1 ? { background: 'repeating-linear-gradient(45deg, #B39DDB, #B39DDB 10px, #80CBC4 10px, #80CBC4 20px, #FFAB91 20px, #FFAB91 30px, #F48FB1 30px, #F48FB1 40px)' } : {}}
+      onClick={(e) => {
+        e.stopPropagation();
         if (isMultiSelectMode) {
           toggleEventSelectionForDelete(event.id);
         } else {
-          setSelectedEventId(event.id); 
+          setSelectedEventId(event.id);
         }
       }}
     >
       <div className="flex items-center gap-2 overflow-hidden w-full">
         {!isMultiSelectMode && <GripVertical className="w-3.5 h-3.5 opacity-40 shrink-0 cursor-grab active:cursor-grabbing" />}
         {isSelected && <CheckSquare className="w-4 h-4 text-primary shrink-0" />}
+        {event.pinned && <Pin className="w-3.5 h-3.5 text-primary fill-primary shrink-0" />}
+        {event.allDay && <CalendarDays className="w-3.5 h-3.5 opacity-60 shrink-0" />}
         <span className="text-sm font-bold text-ink truncate whitespace-nowrap text-ellipsis mr-1 max-w-full">
           {event.title}
         </span>
+        {event.category && (
+          <span className={cn(
+            "text-[10px] uppercase font-black tracking-wider px-1.5 py-0.5 rounded-md bg-ink/10 shrink-0",
+          )}>
+            {event.category}
+          </span>
+        )}
       </div>
       <div className="flex gap-1 shrink-0">
         {event.reminders && event.reminders.length > 0 && <BellRing className="w-3.5 h-3.5 opacity-60" />}

@@ -24,9 +24,15 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [time, setTime] = useState('');
+  const [allDay, setAllDay] = useState(false);
+  const [category, setCategory] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [pinned, setPinned] = useState(false);
+  const [colorOverride, setColorOverride] = useState('');
   const [location, setLocation] = useState('');
   const [selectedMems, setSelectedMems] = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState<Recurrence['type']>('none');
+  const [recurrenceCount, setRecurrenceCount] = useState<number | ''>('');
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isBirthday, setIsBirthday] = useState(false);
 
@@ -128,17 +134,28 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
         onSubmit={e => {
           e.preventDefault();
           if (!title || !date || selectedMems.length === 0) return;
+          const tagList = tagsInput
+            .split(',')
+            .map(t => t.trim())
+            .filter(t => t.length > 0);
           const newEvent: CalendarEvent = {
             id: Math.random().toString(36).substring(7),
             title,
             date,
             endDate: endDate || undefined,
-            startTime: time || undefined,
+            startTime: allDay ? undefined : (time || undefined),
+            allDay,
             location: location || undefined,
             memberIds: selectedMems,
-            recurrence: { type: isBirthday ? 'yearly' : recurrence },
+            recurrence: recurrenceCount && recurrence !== 'none'
+              ? { type: recurrence, count: typeof recurrenceCount === 'number' ? recurrenceCount : undefined }
+              : { type: isBirthday ? 'yearly' : recurrence },
             reminders,
             isBirthday,
+            category: category || undefined,
+            tags: tagList.length > 0 ? tagList : undefined,
+            pinned,
+            colorOverride: colorOverride || undefined,
             ...(driverId ? { driverId } : {}),
           };
 
@@ -154,6 +171,12 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
           setDate('');
           setEndDate('');
           setTime('');
+          setAllDay(false);
+          setCategory('');
+          setTagsInput('');
+          setPinned(false);
+          setColorOverride('');
+          setRecurrenceCount('');
           setLocation('');
           setSelectedMems([]);
           setRecurrence('none');
@@ -267,10 +290,105 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
               id="add-event-time"
               type="time"
               value={time} onChange={e => setTime(e.target.value)}
-              className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-2 sm:p-3 text-sm sm:text-base font-bold outline-none"
+              disabled={allDay}
+              className={cn(
+                "w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-2 sm:p-3 text-sm sm:text-base font-bold outline-none",
+                allDay && "opacity-40 cursor-not-allowed"
+              )}
               aria-label={t('app.time', 'Time')}
             />
           </div>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <label htmlFor="add-event-all-day" className="flex items-center gap-2 cursor-pointer group w-max">
+            <div className={cn(
+              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm",
+              allDay ? "bg-primary border-ink" : "bg-surface border-ink/40 group-hover:border-ink/80"
+            )}>
+              {allDay && (
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-ink rounded-sm transform rotate-45" />
+                </motion.div>
+              )}
+            </div>
+            <input
+              id="add-event-all-day"
+              type="checkbox"
+              className="hidden"
+              checked={allDay}
+              onChange={e => { setAllDay(e.target.checked); if (e.target.checked) setTime(''); }}
+              aria-label={t('app.allDay', 'All-day event')}
+            />
+            <span className="font-bold text-sm text-ink/80 select-none">{t('app.allDay', 'All-day')}</span>
+          </label>
+          <label htmlFor="add-event-pinned" className="flex items-center gap-2 cursor-pointer group w-max">
+            <div className={cn(
+              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm",
+              pinned ? "bg-primary border-ink" : "bg-surface border-ink/40 group-hover:border-ink/80"
+            )}>
+              {pinned && (
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 bg-ink rounded-sm transform rotate-45" />
+                </motion.div>
+              )}
+            </div>
+            <input
+              id="add-event-pinned"
+              type="checkbox"
+              className="hidden"
+              checked={pinned}
+              onChange={e => setPinned(e.target.checked)}
+              aria-label={t('app.pinned', 'Pin to top of day')}
+            />
+            <span className="font-bold text-sm text-ink/80 select-none">{t('app.pinned', 'Pin to top')}</span>
+          </label>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="add-event-category" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.category', 'Category')}</label>
+            <select
+              id="add-event-category"
+              aria-label={t('app.category', 'Category')}
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 text-base font-bold outline-none appearance-none cursor-pointer hover:border-ink/50"
+            >
+              <option value="">{t('app.none', '— None —')}</option>
+              <option value="school">{t('app.catSchool', 'School')}</option>
+              <option value="medical">{t('app.catMedical', 'Medical')}</option>
+              <option value="sports">{t('app.catSports', 'Sports')}</option>
+              <option value="work">{t('app.catWork', 'Work')}</option>
+              <option value="family">{t('app.catFamily', 'Family')}</option>
+              <option value="holiday">{t('app.catHoliday', 'Holiday')}</option>
+              <option value="social">{t('app.catSocial', 'Social')}</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="add-event-color" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.colorOverride', 'Colour')}</label>
+            <input
+              id="add-event-color"
+              type="color"
+              value={colorOverride || '#ff4d15'}
+              onChange={e => setColorOverride(e.target.value)}
+              className="w-full h-12 rounded-xl border-[2px] border-ink/20 bg-surface cursor-pointer p-1"
+              aria-label={t('app.colorOverride', 'Colour override')}
+            />
+          </div>
+        </motion.div>
+
+        <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
+          <label htmlFor="add-event-tags" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.tags', 'Tags (comma separated)')}</label>
+          <input
+            id="add-event-tags"
+            type="text"
+            placeholder={t('app.tagsPlaceholder', 'e.g. soccer, weekly, outdoor')}
+            value={tagsInput}
+            onChange={e => setTagsInput(e.target.value)}
+            className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 font-bold text-sm outline-none"
+            aria-label={t('app.tags', 'Tags')}
+          />
         </motion.div>
 
         <motion.div variants={itemVariants} className="flex flex-col gap-1.5">

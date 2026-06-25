@@ -28,6 +28,8 @@ export type CalendarEvent = {
   endDate?: string; // ISO date string YYYY-MM-DD
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
+  /** Marks an event that spans one or more full days (no clock times). */
+  allDay?: boolean;
   memberIds: string[];
   thumbnailUrl?: string;
   location?: string;
@@ -35,6 +37,10 @@ export type CalendarEvent = {
   reminders?: Reminder[];
   isBirthday?: boolean;
   driverId?: string;
+  /** User-defined category for grouping / colour (e.g. "school", "medical"). */
+  category?: string;
+  /** Free-form tag list for search / filtering. */
+  tags?: string[];
   exceptionDates?: string[]; // Dates to skip in a recurring pattern
   /** Free-form notes / description (round-trips with Google Calendar's `description`). */
   notes?: string;
@@ -42,6 +48,14 @@ export type CalendarEvent = {
   googleEventId?: string;
   /** Last update timestamp (ISO 8601) used by two-way sync conflict resolution. */
   updatedAt?: string;
+  /** IANA timezone id (e.g. "Europe/Paris") when the event should be interpreted in a specific zone. */
+  timeZone?: string;
+  /** Optional override that escapes the family-member colour mapping. */
+  colorOverride?: string;
+  /** Pinned events are always rendered at the top of the day stack. */
+  pinned?: boolean;
+  /** Avatar / photo URL when a member uses an image instead of a letter. */
+  avatarUrl?: string;
 };
 
 export type MemberLocation = {
