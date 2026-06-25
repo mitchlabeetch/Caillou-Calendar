@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: lint · typecheck · build · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint & type-check
+        run: npm run lint
+
+      - name: Unit tests + coverage gate
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Production bundle size check
+        run: |
+          BUNDLE=$(ls -la dist/assets/index-*.js | awk '{print $5}')
+          echo "Bundle size: $BUNDLE bytes"
+          # 800 KB hard cap — adjust in lockstep with Phase 3 code-splitting work.
+          if [ "$BUNDLE" -gt 819200 ]; then
+            echo "::error::Bundle exceeded 800KB budget ($BUNDLE bytes)"
+            exit 1
+          fi
+
+      - name: Audit dependencies
+        run: npm audit --production --audit-level=high
+        continue-on-error: true
