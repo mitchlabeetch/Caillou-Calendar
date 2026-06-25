@@ -12,12 +12,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
-      // Only instrument files matching `include` below. The default
-      // instruments the entire import graph (including the full App
-      // component tree) which exhausts the worker heap before tests
-      // finish reporting. With `all: false`, the coverage map is
-      // restricted to the lib + hooks modules we actually want to gate.
-      all: false,
+      // `all` is a runtime option that lives outside the public
+      // TypeScript surface for some vitest builds. We cast around
+      // it so the gate compiles cleanly while still limiting the
+      // coverage map to the lib + hooks modules we actually want to
+      // score (otherwise the worker OOMs before reporting).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ...({ all: false } as any),
       thresholds: {
         // Lines / statements / functions gate scoped to business
         // logic (lib + hooks). Components are exercised by the

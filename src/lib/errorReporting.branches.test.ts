@@ -19,10 +19,9 @@ describe('errorReporting — DSN-driven paths', () => {
 
   it('initSentry resolves when DSN is set', async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'https://fake@sentry.io/1');
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await initSentry();
-    // Either a warn happened (package missing) or init succeeded (some envs stub the package).
-    // The contract is: no throw.
+    // Contract: no throw regardless of whether @sentry/react is
+    // actually installed in the test environment.
   });
 
   it('reportError handles non-Error values (number)', async () => {

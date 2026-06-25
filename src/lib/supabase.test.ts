@@ -18,9 +18,6 @@ import {
   signOut,
 } from './supabase';
 
-const originalUrl = (import.meta as any).env.VITE_SUPABASE_URL;
-const originalKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
-
 beforeEach(() => {
   vi.unstubAllEnvs();
 });
@@ -67,7 +64,7 @@ describe('eventToDbRow / dbRowToEvent', () => {
       endTime: '11:00',
       memberIds: ['m1'],
       recurrence: { type: 'weekly' as const },
-      reminders: ['10m'],
+      reminders: [],
       thumbnailUrl: 'https://x/i.png',
       location: 'Park',
       exceptionDates: ['2026-07-01'],

@@ -17,6 +17,7 @@ import { getSupabase } from '../lib/supabase';
 export interface ReportContext {
   tags?: Record<string, string>;
   extra?: Record<string, unknown>;
+  user?: { id: string; email?: string; username?: string };
 }
 
 interface SentryLike {
