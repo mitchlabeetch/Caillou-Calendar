@@ -1,12 +1,15 @@
 ﻿import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn, getConflictsForEvent } from '../lib/utils';
-import { MapPin, AlertTriangle, Car } from 'lucide-react';
-import { motion } from 'motion/react';
+import { MapPin, AlertTriangle, Car, Mic, Smile, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useEvents } from '../lib/eventsContext';
 import { CalendarEvent, Recurrence, Reminder } from '../types';
 import * as chrono from 'chrono-node';
 import { ModalShell } from './ModalShell';
+import { listTemplates } from '../lib/recurrenceTemplates';
+import { isVoiceSupported, startVoice } from '../lib/voiceInput';
+import { EMOJI_CATEGORIES } from '../lib/emojiPicker';
 
 type ItemVariants = {
   hidden: { opacity: number; y: number };
@@ -19,7 +22,7 @@ type ContainerVariants = {
 };
 
 export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -32,12 +35,17 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
   const [location, setLocation] = useState('');
   const [selectedMems, setSelectedMems] = useState<string[]>([]);
   const [recurrence, setRecurrence] = useState<Recurrence['type']>('none');
+  const [recurrenceInterval, setRecurrenceInterval] = useState<number>(1);
   const [recurrenceCount, setRecurrenceCount] = useState<number | ''>('');
+  const [exceptionDatesInput, setExceptionDatesInput] = useState('');
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isBirthday, setIsBirthday] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [listening, setListening] = useState(false);
 
   const { setEvents, showToast, events, familyMembers } = useEvents();
   const [driverId, setDriverId] = useState<string>('');
+  const templates = listTemplates();
 
   useEffect(() => {
     if (title.length > 3) {
@@ -138,6 +146,10 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
             .split(',')
             .map(t => t.trim())
             .filter(t => t.length > 0);
+          const exceptionDates = exceptionDatesInput
+            .split(',')
+            .map(s => s.trim())
+            .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s));
           const newEvent: CalendarEvent = {
             id: Math.random().toString(36).substring(7),
             title,
@@ -148,8 +160,9 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
             location: location || undefined,
             memberIds: selectedMems,
             recurrence: recurrenceCount && recurrence !== 'none'
-              ? { type: recurrence, count: typeof recurrenceCount === 'number' ? recurrenceCount : undefined }
-              : { type: isBirthday ? 'yearly' : recurrence },
+              ? { type: recurrence, count: typeof recurrenceCount === 'number' ? recurrenceCount : undefined, interval: recurrenceInterval }
+              : { type: isBirthday ? 'yearly' : recurrence, interval: recurrenceInterval },
+            exceptionDates: exceptionDates.length ? exceptionDates : undefined,
             reminders,
             isBirthday,
             category: category || undefined,
@@ -161,6 +174,15 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
           import('../lib/syncEngine').then(s => s.syncInsert('events', newEvent));
           setEvents(prev => [...prev, newEvent]);
+
+          // Polish: sound cue + undo stack hook + confetti for birthdays.
+          import('../lib/sounds').then(m => m.playCue(newEvent.isBirthday ? 'birthday' : 'click'));
+          import('../lib/undoStack').then(m => {
+            m.pushOp({ type: 'add', eventId: newEvent.id, snapshot: newEvent });
+          });
+          if (newEvent.isBirthday) {
+            import('../lib/confetti').then(m => m.burstConfetti(80));
+          }
 
           if (reminders.length > 0) {
             showToast(t('app.reminderSet', { title }));
@@ -187,13 +209,83 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
         }}>
         <motion.div variants={itemVariants} className="flex flex-col gap-1 relative z-50">
           <label className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.title')}</label>
-          <input
-            autoFocus
-            placeholder={t('app.titlePlaceholderEvent', 'e.g. Soccer Practice')}
-            className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 font-bold text-lg outline-none relative z-10"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-          />
+          <div className="relative">
+            <input
+              autoFocus
+              placeholder={t('app.titlePlaceholderEvent', 'e.g. Soccer Practice')}
+              className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 pr-20 font-bold text-lg outline-none relative z-10"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 z-20">
+              <button
+                type="button"
+                aria-label={t('app.voiceInput', 'Voice input')}
+                title={t('app.voiceInput', 'Voice input')}
+                onClick={() => {
+                  if (!isVoiceSupported()) {
+                    showToast(t('app.voiceNotSupported', 'Voice input not supported in this browser'));
+                    return;
+                  }
+                  if (listening) return;
+                  setListening(true);
+                  startVoice(i18n.language) ? ((session: ReturnType<typeof startVoice>) => {
+                    if (!session) { setListening(false); return; }
+                    session.onResult((text: string) => setTitle(prev => prev ? `${prev} ${text}` : text));
+                    session.onEnd(() => setListening(false));
+                  }) : (() => { setListening(false); })();
+                }}
+                className={cn(
+                  "w-7 h-7 rounded-md border-[2px] border-ink/30 flex items-center justify-center bg-surface hover:bg-bg-light transition-colors",
+                  listening && "bg-primary border-primary animate-pulse"
+                )}
+              >
+                <Mic className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                aria-label={t('app.pickEmoji', 'Pick emoji')}
+                title={t('app.pickEmoji', 'Pick emoji')}
+                onClick={() => setEmojiOpen(o => !o)}
+                className="w-7 h-7 rounded-md border-[2px] border-ink/30 flex items-center justify-center bg-surface hover:bg-bg-light transition-colors"
+              >
+                <Smile className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+          {listening && (
+            <span className="text-[10px] font-bold text-primary mt-1 uppercase tracking-widest">
+              {t('app.listening', 'Listening…')}
+            </span>
+          )}
+          <AnimatePresence>
+            {emojiOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="absolute top-full left-0 right-0 mt-1 bg-surface border-[2px] border-ink shadow-neo rounded-xl overflow-hidden z-50 max-h-[180px] overflow-y-auto p-2"
+              >
+                {EMOJI_CATEGORIES.map(cat => (
+                  <div key={cat.name} className="mb-1.5">
+                    <div className="text-[9px] uppercase font-black tracking-widest opacity-50 px-1 mb-0.5">{cat.name}</div>
+                    <div className="flex flex-wrap gap-0.5">
+                      {cat.emojis.map(e => (
+                        <button
+                          key={e}
+                          type="button"
+                          onClick={() => { setTitle(prev => prev + e); setEmojiOpen(false); }}
+                          className="w-7 h-7 hover:bg-bg-light rounded text-lg flex items-center justify-center"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
           {suggestedEvents.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-surface border-[2px] border-ink shadow-neo rounded-xl overflow-hidden z-50 flex flex-col max-h-[150px] overflow-y-auto">
               {suggestedEvents.map(evt => (
@@ -415,7 +507,7 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
           </label>
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
+        <motion.div variants={itemVariants} className="grid grid-cols-3 gap-3">
           <div className={cn("flex flex-col gap-1.5", isBirthday && "opacity-50 pointer-events-none")}>
             <label htmlFor="add-event-recurrence" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.recurrence')}</label>
             <select
@@ -432,6 +524,19 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
               <option value="yearly">{t('app.yearly')}</option>
             </select>
           </div>
+          <div className={cn("flex flex-col gap-1.5", (isBirthday || recurrence === 'none') && "opacity-50 pointer-events-none")}>
+            <label htmlFor="add-event-interval" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.everyN', 'Every N')}</label>
+            <input
+              id="add-event-interval"
+              type="number"
+              min={1}
+              max={52}
+              value={recurrenceInterval}
+              onChange={e => setRecurrenceInterval(Math.max(1, parseInt(e.target.value || '1', 10)))}
+              className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 text-base font-bold outline-none"
+              aria-label={t('app.everyN', 'Recurrence interval')}
+            />
+          </div>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="add-event-reminder" className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.reminder')}</label>
             <select
@@ -447,6 +552,56 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
               <option value="1d">{t('app.dayBefore1')}</option>
             </select>
           </div>
+        </motion.div>
+
+        {(recurrence !== 'none' || isBirthday) && (
+          <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
+            <label htmlFor="add-event-exceptions" className="text-xs font-black uppercase tracking-widest text-ink/60">
+              {t('app.exceptionDates', 'Skip dates (comma-separated YYYY-MM-DD)')}
+            </label>
+            <input
+              id="add-event-exceptions"
+              type="text"
+              placeholder={t('app.exceptionDatesPlaceholder', '2026-07-04, 2026-07-11')}
+              value={exceptionDatesInput}
+              onChange={e => setExceptionDatesInput(e.target.value)}
+              className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 text-sm font-bold outline-none"
+              aria-label={t('app.exceptionDates', 'Exception dates')}
+            />
+          </motion.div>
+        )}
+
+        <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
+          <label htmlFor="add-event-template" className="text-xs font-black uppercase tracking-widest text-ink/60 flex items-center gap-1">
+            <Sparkles className="w-3 h-3" />
+            {t('app.templates', 'Quick templates')}
+          </label>
+          <select
+            id="add-event-template"
+            aria-label={t('app.templates', 'Quick templates')}
+            value=""
+            onChange={e => {
+              const tpl = templates.find(t => t.id === e.target.value);
+              if (!tpl) return;
+              setTitle(tpl.event.title);
+              if (tpl.event.startTime) setTime(tpl.event.startTime);
+              if (tpl.event.endTime) setEndDate('');
+              if (tpl.event.location) setLocation(tpl.event.location);
+              if (tpl.event.tags?.length) setTagsInput(tpl.event.tags.join(', '));
+              if (tpl.event.category) setCategory(tpl.event.category);
+              if (tpl.event.recurrence?.type) setRecurrence(tpl.event.recurrence.type);
+              if (tpl.event.reminders?.length) setReminders(tpl.event.reminders);
+              if (tpl.event.allDay) setAllDay(true);
+            }}
+            className="w-full rounded-xl border-[2px] border-ink/20 focus:border-ink focus:shadow-neo transition-all bg-surface p-3 text-base font-bold outline-none appearance-none cursor-pointer hover:border-ink/50"
+          >
+            <option value="">{t('app.chooseTemplate', '— Choose a template —')}</option>
+            {templates.map(tpl => (
+              <option key={tpl.id} value={tpl.id}>
+                {tpl.emoji} {tpl.label}
+              </option>
+            ))}
+          </select>
         </motion.div>
 
         <motion.div variants={itemVariants} className="flex flex-col gap-1.5">

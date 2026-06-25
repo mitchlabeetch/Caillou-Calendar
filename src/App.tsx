@@ -13,6 +13,10 @@ import { DayEventsModal } from './components/DayEventsModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ModalShell } from './components/ModalShell';
 import { ReminderSystem } from './components/ReminderSystem';
+import { CommandPalette } from './components/CommandPalette';
+import { OnboardingSplash, shouldShowOnboarding } from './components/OnboardingSplash';
+import { DstBadge } from './components/DstBadge';
+import { PrintPreviewModal } from './components/PrintPreviewModal';
 import { format, addMonths, subMonths, addWeeks, subWeeks, isSameMonth, isSameWeek } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, AlertCircle, BellRing, CheckSquare, Trash2, Download, Printer, Menu, RefreshCw } from 'lucide-react';
 import { cn } from './lib/utils';
@@ -84,13 +88,76 @@ function InteractiveLogo({ onClick, familyMembers = [] }: { onClick?: () => void
 
 export default function App(_props: AppProps) {
   const { t, i18n } = useTranslation();
-  const [view, setView] = useState<'month'|'week'>(() => {
+  const [view, setView] = useState<'month'|'week'|'agenda'>(() => {
     try {
-      return (localStorage.getItem('calendarView') as 'month'|'week') || 'month';
+      return (localStorage.getItem('calendarView') as 'month'|'week'|'agenda') || 'month';
     } catch {
       return 'month';
     }
   });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  useEffect(() => {
+    if (shouldShowOnboarding()) {
+      // Slight delay so the splash doesn't fight the calendar's first paint.
+      const id = window.setTimeout(() => setOnboardingOpen(true), 350);
+      return () => window.clearTimeout(id);
+    }
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent): void {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      // Cmd/Ctrl + P opens the print-preview modal so users can review before printing.
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setPrintOpen(true);
+      }
+      // Undo / redo shortcuts: Cmd+Z / Ctrl+Z, Cmd+Shift+Z / Ctrl+Shift+Z
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        // Lazy-load to avoid pulling the module until needed.
+        import('./lib/undoStack').then(({ popUndo, popRedo }) => {
+          const op = e.shiftKey ? popRedo() : popUndo();
+          if (!op) return;
+          if (op.type === 'add') {
+            setEvents(prev => prev.filter(ev => ev.id !== op.eventId));
+          } else if (op.type === 'delete') {
+            const ev = op.snapshot as CalendarEvent;
+            setEvents(prev => [...prev, ev]);
+          } else if (op.type === 'update') {
+            setEvents(prev => prev.map(ev =>
+              ev.id === op.eventId ? { ...ev, ...(op.before as Partial<CalendarEvent>) } : ev
+            ));
+          } else if (op.type === 'swap') {
+            const a = op.aBefore as CalendarEvent;
+            const b = op.bBefore as CalendarEvent;
+            setEvents(prev => prev.map(ev => {
+              if (ev.id === a.id) return a;
+              if (ev.id === b.id) return b;
+              return ev;
+            }));
+          } else if (op.type === 'multi-delete') {
+            const snaps = op.snapshots as CalendarEvent[];
+            setEvents(prev => [...prev, ...snaps]);
+          }
+        });
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  useEffect(() => {
+    // Fire console easter eggs on first paint.
+    import('./lib/easterEggs').then(m => m.maybeEasterEggs());
+  }, []);
 
   useEffect(() => {
     try {
@@ -383,9 +450,21 @@ export default function App(_props: AppProps) {
   const triggerGoogleSync = async () => {
     try {
       setIsSyncing(true);
-      const { pushEventsToGoogleCalendar } = await import('./lib/googleCalendar');
-      await pushEventsToGoogleCalendar(events);
-      showToast(t('app.syncSuccess'));
+      const { syncEventsWithGoogle } = await import('./lib/googleCalendar');
+      // Two-way sync: pull the visible month (current month ± 1) so the user
+      // gets an immediate view of everything they own upstream without
+      // waiting for an out-of-band background pull.
+      const center = currentDate;
+      const rangeStart = new Date(center.getFullYear(), center.getMonth() - 1, 1);
+      const rangeEnd = new Date(center.getFullYear(), center.getMonth() + 2, 0);
+      const merged = await syncEventsWithGoogle(
+        events,
+        { timeMin: rangeStart.toISOString(), timeMax: rangeEnd.toISOString() },
+        { strategy: 'last-write-wins' },
+        { defaultMemberIds: () => familyMembersState.map(m => m.id) },
+      );
+      setEvents(merged.events);
+      showToast(t('app.syncSuccess', { pushed: merged.result.pushed, pulled: merged.result.pulled }));
       setIsSyncModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -408,6 +487,15 @@ export default function App(_props: AppProps) {
       setIsMultiSelectMode(false);
       setSelectedEventIdsForDelete([]);
     }
+    // Sound + undo-stack hooks for polish (item 🟢3, 🟢4).
+    import('./lib/sounds').then(m => m.playCue('drop'));
+    import('./lib/undoStack').then(m => {
+      if (removed.length === 1) {
+        m.pushOp({ type: 'delete', eventId: removed[0].id, snapshot: removed[0] });
+      } else if (removed.length > 1) {
+        m.pushOp({ type: 'multi-delete', eventIds: removed.map(e => e.id), snapshots: removed });
+      }
+    });
     try {
       if (eventsToDelete.length === 1) {
         await syncDelete('events', eventsToDelete[0]);
@@ -434,6 +522,16 @@ export default function App(_props: AppProps) {
     if (!previous) return;
     const updates = { date: newDate, ...(newTime ? { startTime: newTime } : {}) };
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    // Play "drop" sound on drag-and-drop move.
+    import('./lib/sounds').then(m => m.playCue('drop'));
+    import('./lib/undoStack').then(m => {
+      m.pushOp({
+        type: 'update',
+        eventId: id,
+        before: { date: previous.date, startTime: previous.startTime },
+        after: { date: newDate, startTime: newTime ?? previous.startTime },
+      });
+    });
     void syncUpdate('events', id, updates).catch((err) => {
       console.warn('Move sync failed; rolling back', err);
       setEvents(prev => prev.map(e => e.id === id ? previous : e));
@@ -551,7 +649,7 @@ export default function App(_props: AppProps) {
                   familyMembers={familyMembersState}
                 />
               </div>
-              <div className="relative overflow-hidden flex items-center min-w-0">
+              <div className="relative overflow-hidden flex items-center gap-2 min-w-0">
                 <AnimatePresence mode="popLayout" custom={direction}>
                   <motion.div
                     key={formattedTitle}
@@ -569,6 +667,7 @@ export default function App(_props: AppProps) {
                     }}>{formattedTitle}</span>
                   </motion.div>
                 </AnimatePresence>
+                <DstBadge referenceDate={format(currentDate, 'yyyy-MM-dd')} />
               </div>
             </div>
           </div>
@@ -576,23 +675,32 @@ export default function App(_props: AppProps) {
           <div className="print-hide flex gap-1.5 md:gap-4 items-center shrink-0">
             {/* Desktop View Switcher */}
             <div className="hidden sm:flex items-center bg-surface border-[2px] md:border-thick rounded-full p-1 shadow-neo-sm md:shadow-neo h-[36px] sm:h-[40px] md:h-[52px]">
-              <button 
+              <button
                 onClick={() => { setDirection(0); setView('month'); }}
                 className={cn(
-                  "h-full px-3 sm:px-4 lg:px-8 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
+                  "h-full px-3 sm:px-4 lg:px-4 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
                   view === 'month' ? "bg-primary text-white border-[2px] border-ink shadow-neo-sm" : "text-ink hover:bg-bg-light"
                 )}
               >
                 {t('app.month')}
               </button>
-              <button 
+              <button
                 onClick={() => { setDirection(0); setView('week'); }}
                 className={cn(
-                  "h-full px-3 sm:px-4 lg:px-8 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
+                  "h-full px-3 sm:px-4 lg:px-4 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
                   view === 'week' ? "bg-primary text-white border-[2px] border-ink shadow-neo-sm" : "text-ink hover:bg-bg-light"
                 )}
               >
                 {t('app.week')}
+              </button>
+              <button
+                onClick={() => { setDirection(0); setView('agenda'); }}
+                className={cn(
+                  "h-full px-3 sm:px-4 lg:px-4 rounded-full font-bold text-xs sm:text-sm tracking-widest transition-all uppercase",
+                  view === 'agenda' ? "bg-primary text-white border-[2px] border-ink shadow-neo-sm" : "text-ink hover:bg-bg-light"
+                )}
+              >
+                {t('app.agenda', 'Agenda')}
               </button>
             </div>
             
@@ -628,7 +736,7 @@ export default function App(_props: AppProps) {
                   <Download className="w-4 h-4 md:w-7 md:h-7 font-bold" strokeWidth={3} />
                 </button>
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => setPrintOpen(true)}
                   title={t('app.printCalendar', 'Print Calendar')}
                   aria-label={t('app.printCalendar', 'Print Calendar')}
                   className="print-hide flex items-center justify-center w-8 h-8 md:w-14 md:h-14 rounded-full border-[2px] md:border-[3px] border-ink bg-surface shadow-neo-sm md:shadow-neo hover:-translate-y-1 active:translate-y-1 transition-all hidden sm:flex"
@@ -795,6 +903,8 @@ export default function App(_props: AppProps) {
                     <CalendarAgenda currentDate={currentDate} onDateClick={setSelectedDay} />
                   ) : view === 'month' ? (
                     <CalendarMonth currentDate={currentDate} onDateClick={setSelectedDay} />
+                  ) : view === 'agenda' ? (
+                    <CalendarAgenda currentDate={currentDate} onDateClick={setSelectedDay} />
                   ) : (
                     <CalendarWeek currentDate={currentDate} onDateClick={setSelectedDay} />
                   )}
@@ -939,6 +1049,26 @@ export default function App(_props: AppProps) {
           </div>
         </ModalShell>
         </ErrorBoundary>
+
+        {/* Command palette (cmd/ctrl + K) */}
+        <CommandPalette
+          isOpen={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          events={events}
+          onPickEvent={(id) => setSelectedEventId(id)}
+        />
+
+        {/* Onboarding splash — only the first time */}
+      <OnboardingSplash
+        visible={onboardingOpen}
+        onClose={() => setOnboardingOpen(false)}
+      />
+
+      {/* Print preview — Cmd/Ctrl+P */}
+      <PrintPreviewModal
+        isOpen={printOpen}
+        onClose={() => setPrintOpen(false)}
+      />
       </div>
     </EventsContext.Provider>
   );

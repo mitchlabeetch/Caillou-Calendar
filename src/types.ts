@@ -5,6 +5,8 @@ export type FamilyMember = {
   bgClass: string;
   icon: string;
   currentLocation?: { text: string; icon: string; updatedAt?: string };
+  /** Optional avatar image (data URL or remote) — takes precedence over icon/initial. */
+  avatarUrl?: string;
 };
 
 export type Place = {
@@ -17,6 +19,8 @@ export type Recurrence = {
   type: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
   endDate?: string;
   count?: number;
+  /** Repeat every N units of `type` (e.g. every 2 weeks). Defaults to 1. */
+  interval?: number;
 };
 
 export type Reminder = '15m' | '1h' | '1d';
@@ -67,6 +71,10 @@ export type MemberLocation = {
 export type AppSettings = {
   startOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday
   timeFormat: '12h' | '24h';
+  /** Optional family identifier used to mint iCal subscription URLs. */
+  familyId?: string;
+  /** Active IANA timezone (or 'auto' to use the browser). */
+  timezone?: string;
 };
 
 export type UserRole = 'admin' | 'member' | 'child';

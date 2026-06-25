@@ -14,6 +14,9 @@ export type UndoableOp =
   | { type: 'swap'; aId: string; bId: string; aBefore: unknown; bBefore: unknown }
   | { type: 'multi-delete'; eventIds: string[]; snapshots: unknown[] };
 
+/** Convenience for callers that only know about a single event id. */
+export type SingleEventOp = Extract<UndoableOp, { eventId: string }>;
+
 interface UndoStack {
   past: UndoableOp[];
   future: UndoableOp[];

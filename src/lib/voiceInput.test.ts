@@ -9,10 +9,8 @@ describe('voiceInput', () => {
   it('returns null when no recognition constructor exists', () => {
     const original = window.SpeechRecognition;
     const originalWebkit = window.webkitSpeechRecognition;
-    // @ts-expect-error – intentional missing for the test
-    delete window.SpeechRecognition;
-    // @ts-expect-error – intentional missing for the test
-    delete window.webkitSpeechRecognition;
+    delete (window as any).SpeechRecognition;
+    delete (window as any).webkitSpeechRecognition;
     expect(startVoice()).toBeNull();
     window.SpeechRecognition = original;
     window.webkitSpeechRecognition = originalWebkit;

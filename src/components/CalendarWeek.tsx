@@ -104,6 +104,37 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
           </div>
 
           <div className="flex-1 overflow-y-auto overflow-x-hidden relative bg-surface rounded-b-xl sm:rounded-b-3xl">
+        {/* All-day strip */}
+        <div className="grid grid-cols-[30px_repeat(7,1fr)] sm:grid-cols-8 border-b-[2px] sm:border-b-[4px] border-ink/10 min-h-[40px]">
+          <div className="border-r-[2px] sm:border-r-[4px] border-ink flex items-center justify-end px-1 text-[8px] sm:text-[10px] uppercase font-bold text-ink/40">
+            {t('app.allDay', 'All day')}
+          </div>
+          {days.map((day) => {
+            const dayStr = format(day, 'yyyy-MM-dd');
+            const allDay = getDayEvents(day).filter(e => e.allDay);
+            return (
+              <div
+                key={dayStr}
+                className="border-r-[1px] border-ink/10 last:border-r-0 p-0.5 flex flex-col gap-0.5 min-w-0"
+              >
+                {allDay.slice(0, 3).map((ev) => (
+                  <button
+                    key={ev.id}
+                    onClick={() => setSelectedEventId(ev.id)}
+                    className="text-left text-[8px] sm:text-[10px] font-bold truncate bg-primary/20 border-l-[3px] border-primary px-1 rounded-sm hover:bg-primary/30 transition-colors"
+                    title={ev.title}
+                  >
+                    {ev.title}
+                  </button>
+                ))}
+                {allDay.length > 3 && (
+                  <span className="text-[8px] font-bold opacity-60">+{allDay.length - 3}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         {hours.map((hour) => (
           <div key={hour} className="grid grid-cols-[30px_repeat(7,1fr)] sm:grid-cols-8 h-[60px] group relative">
             <div className="relative border-r-[2px] sm:border-r-[4px] border-ink pr-1 sm:pr-4 flex justify-end bg-surface">

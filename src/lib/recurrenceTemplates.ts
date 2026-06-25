@@ -29,7 +29,7 @@ export const BUILTIN_TEMPLATES: EventTemplate[] = [
       startTime: '17:30',
       endTime: '18:30',
       recurrence: { type: 'weekly' },
-      reminders: [{ offsetMinutes: 60, kind: 'notification' }],
+      reminders: ['1h'],
       tags: ['kids', 'sport'],
       category: 'sports',
     },

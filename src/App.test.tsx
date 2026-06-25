@@ -95,6 +95,11 @@ describe('App integration', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    // Mark the onboarding splash as already dismissed so the first-launch
+    // modal doesn't fight the Escape-key test or pollute `role="dialog"`
+    // counts. The onboarding behaviour is covered separately by
+    // `OnboardingSplash.test.tsx`.
+    localStorage.setItem('synoptic-onboarding-dismissed', '1');
   });
 
   it('renders the calendar shell without crashing', async () => {

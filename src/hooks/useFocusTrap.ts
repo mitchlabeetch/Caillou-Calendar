@@ -33,12 +33,14 @@ export function useFocusTrap(isActive: boolean, returnFocusRef?: React.RefObject
     if (focusables.length > 0) focusables[0].focus();
     else container.tabIndex = -1, container.focus();
 
+    const containerEl: HTMLElement = container;
     function onKeyDown(e: KeyboardEvent): void {
       if (e.key !== 'Tab') return;
-      const list = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
+      const list = Array.from(containerEl.querySelectorAll<HTMLElement>(FOCUSABLE));
       if (list.length === 0) return;
       const first = list[0];
       const last = list[list.length - 1];
+      if (!first || !last) return;
       const active = document.activeElement as HTMLElement | null;
       if (e.shiftKey && active === first) {
         e.preventDefault();
@@ -49,9 +51,9 @@ export function useFocusTrap(isActive: boolean, returnFocusRef?: React.RefObject
       }
     }
 
-    container.addEventListener('keydown', onKeyDown);
+    containerEl.addEventListener('keydown', onKeyDown);
     return () => {
-      container.removeEventListener('keydown', onKeyDown);
+      containerEl.removeEventListener('keydown', onKeyDown);
       const target = returnFocusRef?.current ?? previouslyFocused;
       target?.focus?.();
     };

@@ -1,11 +1,13 @@
 ﻿import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
-import { CalendarIcon, Clock, Users, Edit3, Trash2, Download, X } from 'lucide-react';
+import { CalendarIcon, Clock, Users, Edit3, Trash2, Download, X, MapPin } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
 import { ModalShell } from './ModalShell';
 import { exportEventsToICS } from '../lib/exportIcs';
 import { canEditEvent, canDeleteEvent } from '../lib/permissions';
+import { MapPreviewCard } from './MapPreviewCard';
+import { WeatherChip } from './WeatherChip';
 
 export function EventDetailModal({ isOpen, onClose, eventId }: { isOpen: boolean, onClose: () => void, eventId: string }) {
   const { t } = useTranslation();
@@ -200,9 +202,51 @@ export function EventDetailModal({ isOpen, onClose, eventId }: { isOpen: boolean
                     </div>
                   </div>
                 </div>
+
+                {event.location && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full border-[2px] border-ink bg-mem-4 flex items-center justify-center shadow-sm">
+                      <MapPin className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.location')}</div>
+                      <div className="font-bold text-lg truncate">{event.location}</div>
+                    </div>
+                  </div>
+                )}
+
+                {event.location && (
+                  <MapPreviewCard location={event.location} />
+                )}
+
+                {event.date && (
+                  <div className="mt-2">
+                    <WeatherChip date={event.date} />
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-4">
+                {canEdit && (
+                  <button
+                    onClick={() => {
+                      const next = prompt(t('app.moveToPrompt', 'Move to (YYYY-MM-DD):'), event.date);
+                      if (!next) return;
+                      if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) {
+                        alert(t('app.invalidDate', 'Invalid date format. Use YYYY-MM-DD.'));
+                        return;
+                      }
+                      setEvents(evs => evs.map(ev =>
+                        ev.id === event.id ? { ...ev, date: next } : ev
+                      ));
+                      onClose();
+                    }}
+                    className="flex-1 h-14 bg-surface border-[3px] border-ink shadow-neo rounded-xl font-bold flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"
+                    title={t('app.moveTo', 'Move to date')}
+                  >
+                    {t('app.moveTo', 'Move to')}
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     onClick={() => {

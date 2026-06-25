@@ -1,7 +1,7 @@
-﻿import { useState } from 'react';
+﻿import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, Home, GraduationCap, Shield, Briefcase, Dumbbell, Car, Plane, MapPin, Coffee, Users, Building, Heart, Star, Cloud, Sun, Moon } from 'lucide-react';
+import { Plus, Trash2, Home, GraduationCap, Shield, Briefcase, Dumbbell, Car, Plane, MapPin, Coffee, Users, Building, Heart, Star, Cloud, Sun, Moon, Image as ImageIcon } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
 import { cn } from '../lib/utils';
 import { ModalShell } from './ModalShell';
@@ -16,6 +16,7 @@ export function FamilyModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
   const { t } = useTranslation();
   const { familyMembers, addFamilyMember, updateFamilyMember, deleteFamilyMember } = useEvents();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const avatarRef = useRef<HTMLInputElement>(null);
 
   return (
     <ModalShell
@@ -43,9 +44,11 @@ export function FamilyModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                 <div className="flex items-center gap-3">
                   <div
                     onClick={() => setExpandedId(isExpanded ? null : m.id)}
-                    className={cn("w-10 h-10 rounded-full border-[2px] border-ink flex items-center justify-center shadow-sm shrink-0 text-lg font-black uppercase text-ink cursor-pointer hover:scale-105 transition-transform", m.bgClass)}
+                    className={cn("w-10 h-10 rounded-full border-[2px] border-ink flex items-center justify-center shadow-sm shrink-0 text-lg font-black uppercase text-ink cursor-pointer hover:scale-105 transition-transform overflow-hidden", m.bgClass)}
                   >
-                     {SelectedIcon ? <SelectedIcon className="w-5 h-5" /> : (m.name[0] || '?')}
+                     {m.avatarUrl
+                       ? <img src={m.avatarUrl} alt={m.name} className="w-full h-full object-cover" />
+                       : (SelectedIcon ? <SelectedIcon className="w-5 h-5" /> : (m.name[0] || '?'))}
                   </div>
                   <div className="flex-1 min-w-0">
                     <input
@@ -73,6 +76,48 @@ export function FamilyModal({ isOpen, onClose }: { isOpen: boolean; onClose: () 
                       exit={{ height: 0, opacity: 0 }}
                       className="flex flex-col gap-4 overflow-hidden"
                     >
+                      <div className="pt-4 border-t-2 border-ink/10 mt-2 flex flex-col gap-2">
+                        <span className="text-xs font-bold text-ink/50 uppercase tracking-wider">{t('app.avatar', 'Avatar image')}</span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={avatarRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !expandedId) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                if (typeof reader.result === 'string') {
+                                  updateFamilyMember(expandedId, { avatarUrl: reader.result });
+                                }
+                              };
+                              reader.readAsDataURL(file);
+                              if (avatarRef.current) avatarRef.current.value = '';
+                            }}
+                            aria-label={t('app.avatar', 'Avatar image')}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => avatarRef.current?.click()}
+                            className="flex items-center gap-1.5 px-3 h-9 rounded-lg border-[2px] border-ink/30 text-xs font-bold hover:bg-bg-light transition-colors"
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                            {t('app.uploadAvatar', 'Upload')}
+                          </button>
+                          {m.avatarUrl && (
+                            <button
+                              type="button"
+                              onClick={() => updateFamilyMember(m.id, { avatarUrl: undefined })}
+                              className="px-3 h-9 rounded-lg text-xs font-bold text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              {t('app.removeAvatar', 'Remove')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="pt-4 border-t-2 border-ink/10 mt-2 flex flex-col gap-2">
                         <span className="text-xs font-bold text-ink/50 uppercase tracking-wider">{t('app.color')}</span>
                         <div className="flex gap-2">

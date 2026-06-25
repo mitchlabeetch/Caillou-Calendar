@@ -13,13 +13,14 @@ describe('undoStack', () => {
   it('pushes an op and exposes it', () => {
     pushOp({ type: 'add', eventId: 'e1', snapshot: {} });
     expect(canUndo()).toBe(true);
-    expect(peekUndo()?.eventId).toBe('e1');
+    const top = peekUndo();
+    expect(top?.type === 'add' ? top.eventId : null).toBe('e1');
   });
 
   it('pops an op and moves it to redo', () => {
     pushOp({ type: 'add', eventId: 'e1', snapshot: {} });
     const op = popUndo();
-    expect(op?.eventId).toBe('e1');
+    expect(op?.type === 'add' ? op.eventId : null).toBe('e1');
     expect(canUndo()).toBe(false);
     expect(canRedo()).toBe(true);
   });
@@ -28,7 +29,7 @@ describe('undoStack', () => {
     pushOp({ type: 'add', eventId: 'e1', snapshot: {} });
     popUndo();
     const op = popRedo();
-    expect(op?.eventId).toBe('e1');
+    expect(op?.type === 'add' ? op.eventId : null).toBe('e1');
     expect(canRedo()).toBe(false);
   });
 

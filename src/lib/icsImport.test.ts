@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { parseIcs, icsToEvents } from './icsImport';
 
 const SAMPLE_ICS = [

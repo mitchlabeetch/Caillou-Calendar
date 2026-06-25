@@ -127,7 +127,7 @@ button, a, [role="button"] {
     size: landscape;
     margin: 1cm;
   }
-  
+
   body, html {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
@@ -137,8 +137,22 @@ button, a, [role="button"] {
 
   .print-hide,
   aside,
+  .no-print,
   [role="dialog"] {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-only table {
+    page-break-inside: auto;
+  }
+
+  .print-only tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
   }
 
   header {

@@ -14,8 +14,8 @@ import { addMonths, subMonths, addWeeks, subWeeks, isSameMonth, isSameWeek, isSa
  *   1–9            toggle family member filter
  */
 export interface KeyboardControls {
-  view: 'month' | 'week';
-  setView: (v: 'month' | 'week') => void;
+  view: 'month' | 'week' | 'agenda';
+  setView: (v: 'month' | 'week' | 'agenda') => void;
   currentDate: Date;
   setCurrentDate: (d: Date) => void;
   toggleMember?: (id: string) => void;

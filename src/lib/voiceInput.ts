@@ -54,6 +54,8 @@ export function isVoiceSupported(): boolean {
 export interface VoiceSession {
   stop(): void;
   final: Promise<string>;
+  onResult(cb: (text: string, isFinal: boolean) => void): void;
+  onEnd(cb: () => void): void;
 }
 
 export function startVoice(lang = navigator.language ?? 'en-US'): VoiceSession | null {
@@ -68,14 +70,25 @@ export function startVoice(lang = navigator.language ?? 'en-US'): VoiceSession |
   let resolveFinal!: (text: string) => void;
   const final = new Promise<string>(res => { resolveFinal = res; });
 
+  let resultCb: ((text: string, isFinal: boolean) => void) | null = null;
+  let endCb: (() => void) | null = null;
+
   recognition.onresult = (e: SpeechRecognitionEventLike) => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
-      if (r.isFinal) resolveFinal(r[0].transcript.trim());
+      const text = r[0].transcript.trim();
+      if (resultCb) resultCb(text, r.isFinal);
+      if (r.isFinal) resolveFinal(text);
     }
   };
-  recognition.onend = () => resolveFinal('');
-  recognition.onerror = () => resolveFinal('');
+  recognition.onend = () => {
+    resolveFinal('');
+    if (endCb) endCb();
+  };
+  recognition.onerror = () => {
+    resolveFinal('');
+    if (endCb) endCb();
+  };
 
   try {
     recognition.start();
@@ -87,5 +100,7 @@ export function startVoice(lang = navigator.language ?? 'en-US'): VoiceSession |
       try { recognition.stop(); } catch { /* ignore */ }
     },
     final,
+    onResult(cb) { resultCb = cb; },
+    onEnd(cb) { endCb = cb; },
   };
 }

@@ -1,19 +1,35 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe, Sun, Bell, Layout, Clock } from 'lucide-react';
+import { Globe, Sun, Bell, Layout, Clock, Palette, Volume2, Link2, Upload } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
 import { subscribeToPush, unsubscribeFromPush, getPushSubscription } from '../lib/pushNotifications';
 import { useTheme } from '../hooks/useTheme';
 import { useUserRole } from '../hooks/useUserRole';
 import { ModalShell } from './ModalShell';
+import { TIMEZONE_OPTIONS, resolveActiveTimezone } from '../lib/timezoneOptions';
+import { COLOR_SCHEMES, setActiveColorScheme, getActiveColorScheme } from '../lib/colorSchemes';
+import { isSoundEnabled, setSoundEnabled, playCue } from '../lib/sounds';
+import { buildIcsSubscriptionUrl, copyToClipboard } from '../lib/icsSubscription';
+import { parseIcs, icsToEvents } from '../lib/icsImport';
+import { pushOp } from '../lib/undoStack';
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
-  const { settings, updateSettings } = useEvents();
+  const { settings, updateSettings, setEvents } = useEvents();
   const [theme, setTheme] = useTheme();
   const [userRole, setUserRole] = useUserRole();
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [timezone, setTimezone] = useState<string>(() => {
+    if (typeof localStorage === 'undefined') return 'auto';
+    return localStorage.getItem('synoptic-timezone') ?? 'auto';
+  });
+  const [schemeId, setSchemeId] = useState(() => getActiveColorScheme().id);
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [importState, setImportState] = useState<'idle' | 'ok' | 'fail'>('idle');
+  const [importCount, setImportCount] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -138,6 +154,145 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
               <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white border border-ink transition-transform ${pushEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </div>
           </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="settings-timezone" className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1">
+            <Clock className="w-3 h-3"/> {t('app.timezone', 'Timezone')}
+          </label>
+          <select
+            id="settings-timezone"
+            aria-label={t('app.timezone', 'Timezone')}
+            className="h-12 border-[2px] border-ink rounded-xl px-3 font-bold bg-bg-light outline-none cursor-pointer"
+            value={timezone}
+            onChange={(e) => {
+              setTimezone(e.target.value);
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('synoptic-timezone', e.target.value);
+              }
+            }}
+          >
+            {TIMEZONE_OPTIONS.map(tz => (
+              <option key={tz.id} value={tz.id}>{tz.label}</option>
+            ))}
+          </select>
+          <p className="text-[10px] opacity-50">{t('app.activeTz', 'Active')}: {resolveActiveTimezone(timezone)}</p>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="settings-scheme" className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1">
+            <Palette className="w-3 h-3"/> {t('app.colorScheme', 'Colour scheme')}
+          </label>
+          <select
+            id="settings-scheme"
+            aria-label={t('app.colorScheme', 'Colour scheme')}
+            className="h-12 border-[2px] border-ink rounded-xl px-3 font-bold bg-bg-light outline-none cursor-pointer"
+            value={schemeId}
+            onChange={(e) => {
+              setSchemeId(e.target.value as typeof schemeId);
+              setActiveColorScheme(e.target.value as typeof schemeId);
+            }}
+          >
+            {Object.values(COLOR_SCHEMES).map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1">
+            <Volume2 className="w-3 h-3"/> {t('app.soundEffects', 'Sound effects')}
+          </label>
+          <button
+            type="button"
+            aria-pressed={soundOn}
+            onClick={() => {
+              const next = !soundOn;
+              setSoundEnabled(next);
+              setSoundOn(next);
+              if (next) playCue('click');
+            }}
+            className="flex items-center justify-between p-3 border-[2px] border-ink rounded-xl bg-bg-light hover:bg-ink/5 transition-colors"
+          >
+            <span className="font-bold text-sm">{soundOn ? t('app.soundOn', 'Sound on') : t('app.soundOff', 'Sound off')}</span>
+            <div className={`w-12 h-6 rounded-full border-2 border-ink relative transition-colors ${soundOn ? 'bg-primary' : 'bg-gray-300'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white border border-ink transition-transform ${soundOn ? 'translate-x-6' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1">
+            <Link2 className="w-3 h-3"/> {t('app.icsSubscription', 'iCal subscription URL')}
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              readOnly
+              value={buildIcsSubscriptionUrl(settings.familyId ?? 'family-default').url}
+              aria-label={t('app.icsSubscription', 'iCal subscription URL')}
+              className="flex-1 min-w-0 h-12 border-[2px] border-ink rounded-xl px-3 font-mono text-xs bg-bg-light outline-none"
+              onFocus={(e) => e.currentTarget.select()}
+            />
+            <button
+              type="button"
+              className="px-4 h-12 border-[2px] border-ink rounded-xl bg-primary text-ink font-bold shadow-neo-sm hover:-translate-y-0.5 active:translate-y-0 transition-transform"
+              onClick={async () => {
+                const ok = await copyToClipboard(buildIcsSubscriptionUrl(settings.familyId ?? 'family-default').url);
+                setCopyState(ok ? 'copied' : 'failed');
+                setTimeout(() => setCopyState('idle'), 2000);
+              }}
+            >
+              {copyState === 'copied' ? t('app.urlCopied', 'Copied!') : t('app.copyUrl', 'Copy')}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-[10px] font-black uppercase tracking-widest opacity-50 flex items-center gap-1">
+            <Upload className="w-3 h-3"/> {t('app.importIcs', 'Import .ics file')}
+          </label>
+          <div className="flex gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".ics,text/calendar"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  const text = await file.text();
+                  const parsed = parseIcs(text);
+                  const events = icsToEvents(parsed);
+                  setEvents(prev => [...prev, ...events]);
+                  setImportCount(events.length);
+                  setImportState('ok');
+                  for (const ev of events) {
+                    pushOp({ type: 'add', eventId: ev.id, snapshot: ev });
+                  }
+                } catch {
+                  setImportState('fail');
+                } finally {
+                  setTimeout(() => setImportState('idle'), 2500);
+                  if (fileRef.current) fileRef.current.value = '';
+                }
+              }}
+              aria-label={t('app.importIcs', 'Import .ics file')}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex-1 h-12 border-[2px] border-ink rounded-xl bg-surface font-bold shadow-neo-sm hover:-translate-y-0.5 active:translate-y-0 transition-transform flex items-center justify-center gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              {importState === 'ok'
+                ? t('app.importedEvents', { count: importCount })
+                : importState === 'fail'
+                  ? t('app.importFailed', 'Import failed')
+                  : t('app.chooseFile', 'Choose .ics file')}
+            </button>
+          </div>
         </div>
       </div>
     </ModalShell>

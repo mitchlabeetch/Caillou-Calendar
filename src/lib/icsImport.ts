@@ -26,7 +26,7 @@ function unfold(text: string): string {
   return text.replace(/\r?\n[ \t]/g, '');
 }
 
-function parseDate(value: string, tzid: string | undefined): { iso: string; allDay: boolean } {
+function parseDate(value: string): { iso: string; allDay: boolean } {
   // DATE: 20251231   → 2025-12-31
   // DATETIME: 20251231T093000Z / 20251231T093000
   const v = value.trim();
@@ -38,9 +38,8 @@ function parseDate(value: string, tzid: string | undefined): { iso: string; allD
   const [, y, mo, d, hh, mm, ss, z] = m;
   const date = `${y}-${mo}-${d}`;
   if (z === 'Z') return { iso: `${date}T${hh}:${mm}:${ss}.000Z`, allDay: false };
-  // floating local — treat as UTC for parsing convenience; the caller can
-  // re-tag with `tzid` if provided. For our purposes we just store the
-  // time-of-day.
+  // floating local — treat as UTC for parsing convenience. We don't yet
+  // re-tag with the TZID parameter because the app stores ISO strings.
   return { iso: `${date}T${hh}:${mm}:${ss}.000Z`, allDay: false };
 }
 
@@ -63,18 +62,15 @@ export function parseIcs(text: string): IcsEvent[] {
   // also catches bare LF + space in hand-crafted fixtures.
   const unfolded = unfold(text.replace(/\r?\n/g, '\r\n')).split(/\r?\n/);
   let current: Partial<IcsEvent> | null = null;
-  let tzid: string | undefined;
   for (const raw of unfolded) {
     const line = raw.trim();
     if (line === 'BEGIN:VEVENT') {
       current = { exdates: [] };
-      tzid = undefined;
     } else if (line === 'END:VEVENT') {
       if (current && current.uid && current.summary && current.dtStart) {
         out.push(current as IcsEvent);
       }
       current = null;
-      tzid = undefined;
     } else if (!current) {
       continue;
     } else if (line.startsWith('UID:')) {
@@ -88,22 +84,21 @@ export function parseIcs(text: string): IcsEvent[] {
     } else if (line.startsWith('DTSTART')) {
       const m = /^DTSTART(?:;TZID=([^:]+))?:(.+)$/.exec(line);
       if (m) {
-        tzid = m[1];
-        const { iso, allDay } = parseDate(m[2], tzid);
+        const { iso, allDay } = parseDate(m[2]);
         current.dtStart = iso;
         current.allDay = allDay;
       }
     } else if (line.startsWith('DTEND')) {
       const m = /^DTEND(?:;TZID=([^:]+))?:(.+)$/.exec(line);
       if (m) {
-        const { iso } = parseDate(m[2], m[1]);
+        const { iso } = parseDate(m[2]);
         current.dtEnd = iso;
       }
     } else if (line.startsWith('RRULE:')) {
       current.rrule = parseRrule(line.slice(6));
     } else if (line.startsWith('EXDATE')) {
       const m = /^EXDATE.*?:(.+)$/.exec(line);
-      if (m) current.exdates!.push(parseDate(m[1], undefined).iso.slice(0, 10));
+      if (m) current.exdates!.push(parseDate(m[1]).iso.slice(0, 10));
     }
   }
   return out;
