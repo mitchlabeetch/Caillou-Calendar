@@ -20,6 +20,9 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
   return {
     events: [] as CalendarEvent[],
     setEvents: vi.fn(),
+    addEvent: vi.fn(() => Promise.resolve(true)),
+    addEvents: vi.fn(() => Promise.resolve(true)),
+    updateEvent: vi.fn(() => Promise.resolve(true)),
     deleteEvent: vi.fn(),
     moveEvent: vi.fn(),
     swapEvents: vi.fn(),
@@ -46,6 +49,10 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
     userRole: 'admin',
     user: null,
     ...overrides,
+  } as unknown as EventsContextType & {
+    addEvent: ReturnType<typeof vi.fn>;
+    addEvents: ReturnType<typeof vi.fn>;
+    updateEvent: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -78,14 +85,39 @@ describe('AddEventModal integration', () => {
   });
 
   it('does not submit when required fields are missing', () => {
-    const setEvents = vi.fn();
-    const { onClose } = renderModal(makeContext({ setEvents }));
+    const addEvent = vi.fn(() => Promise.resolve(true));
+    const { onClose } = renderModal(makeContext({ addEvent } as any));
     const dialog = screen.getByRole('dialog');
     const form = dialog.querySelector('form') as HTMLFormElement;
     expect(form).toBeTruthy();
     fireEvent.submit(form);
-    expect(setEvents).not.toHaveBeenCalled();
+    expect(addEvent).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('submits through addEvent instead of the raw state setter', async () => {
+    const addEvent = vi.fn(() => Promise.resolve(true));
+    const setEvents = vi.fn();
+    const { onClose } = renderModal(makeContext({ addEvent, setEvents } as any));
+    const dialog = screen.getByRole('dialog');
+
+    fireEvent.change(within(dialog).getByPlaceholderText(/pizza party/i), {
+      target: { value: 'Pizza Party' },
+    });
+
+    const inputs = dialog.querySelectorAll('input[type="date"]');
+    fireEvent.change(inputs[0] as HTMLInputElement, { target: { value: '2026-06-30' } });
+
+    const attendeesGroup = within(dialog).getByRole('group', { name: /who/i });
+    fireEvent.click(within(attendeesGroup).getByRole('button', { name: /alice/i }));
+
+    fireEvent.submit(dialog.querySelector('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(addEvent).toHaveBeenCalledTimes(1);
+    });
+    expect(setEvents).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('title field auto-parses natural-language dates via chrono-node', async () => {
@@ -103,10 +135,9 @@ describe('AddEventModal integration', () => {
   it('family member chips toggle selection', () => {
     renderModal(makeContext());
     const dialog = screen.getByRole('dialog');
-    // Two member rows exist: "Who" and "Driver" — both render the same family members.
-    // We test the first occurrence (Who) which has `title === mem.name`.
-    const aliceBtn = within(dialog).getAllByTitle('Alice')[0];
-    const bobBtn = within(dialog).getAllByTitle('Bob')[0];
+    const attendeesGroup = within(dialog).getByRole('group', { name: /who/i });
+    const aliceBtn = within(attendeesGroup).getByRole('button', { name: /alice/i });
+    const bobBtn = within(attendeesGroup).getByRole('button', { name: /bob/i });
     expect(aliceBtn).toBeTruthy();
     expect(bobBtn).toBeTruthy();
     fireEvent.click(aliceBtn);
@@ -132,12 +163,45 @@ describe('AddEventModal integration', () => {
     const timeInput = dialog.querySelector('input[type="time"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: '2026-06-25' } });
     fireEvent.change(timeInput, { target: { value: '10:00' } });
-    // Use the FIRST "Who" chip (not the Driver chip).
-    const aliceBtn = within(dialog).getAllByTitle('Alice')[0];
+    const attendeesGroup = within(dialog).getByRole('group', { name: /who/i });
+    const aliceBtn = within(attendeesGroup).getByRole('button', { name: /alice/i });
     if (aliceBtn) fireEvent.click(aliceBtn);
     await waitFor(() => {
       expect(within(dialog).queryByText(/Scheduling Conflict/i)).toBeTruthy();
     });
+  });
+
+  it('keeps custom boolean controls focusable and keyboard-operable', () => {
+    renderModal(makeContext());
+    const dialog = screen.getByRole('dialog');
+
+    const allDay = within(dialog).getByRole('checkbox', { name: /all day/i }) as HTMLInputElement;
+    const pinned = within(dialog).getByRole('checkbox', { name: /pin|pinned/i }) as HTMLInputElement;
+    const birthday = within(dialog).getByRole('checkbox', { name: /birthday/i }) as HTMLInputElement;
+
+    allDay.focus();
+    expect(document.activeElement).toBe(allDay);
+
+    fireEvent.click(allDay);
+    fireEvent.click(pinned);
+    fireEvent.click(birthday);
+
+    expect(allDay.checked).toBe(true);
+    expect(pinned.checked).toBe(true);
+    expect(birthday.checked).toBe(true);
+  });
+
+  it('gives attendee and driver pills accessible names', () => {
+    renderModal(makeContext());
+    const dialog = screen.getByRole('dialog');
+
+    const attendeesGroup = within(dialog).getByRole('group', { name: /who/i });
+    const driverGroup = within(dialog).getByRole('group', { name: /driver/i });
+
+    expect(within(attendeesGroup).getByRole('button', { name: /alice/i })).toBeTruthy();
+    expect(within(attendeesGroup).getByRole('button', { name: /bob/i })).toBeTruthy();
+    expect(within(driverGroup).getByRole('button', { name: /alice/i })).toBeTruthy();
+    expect(within(driverGroup).getByRole('button', { name: /bob/i })).toBeTruthy();
   });
 
   it('renders nothing when closed', () => {

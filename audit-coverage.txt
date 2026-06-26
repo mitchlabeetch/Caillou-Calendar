@@ -1,0 +1,230 @@
+﻿
+> react-example@0.0.0 test:coverage
+> vitest run --coverage
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90mC:/Users/tanag/Desktop/Caillou/Caillou-Calendar[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/lib/googleCalendar.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+node.exe : Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+In Zeile:1 Zeichen:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Not implemented...vas npm package:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ [32m✓[39m src/lib/confetti.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 66[2mms[22m[39m
+[90mstderr[2m | src/lib/localDb.test.ts[2m > [22m[2mflushOutboundSyncQueue[2m > [22m[2mskips an item that 
+throws and continues
+[22m[39mSync queue item failed, will retry: {
+  table: [32m'events'[39m,
+  operation: [32m'insert'[39m,
+  payload: { id: [32m'a'[39m },
+  timestamp: [33m1782480471976[39m,
+  id: [33m8[39m
+} Error: boom
+    at Object.<anonymous> (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.test.ts:217:42)
+    at Object.Mock [as insert] [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vit
+est/spy[24m/dist/index.js:332:34[90m)[39m
+    at Module.flushOutboundSyncQueue (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.ts:195:61)
+[90m    at runNextTicks (node:internal/process/task_queues:65:5)[39m
+[90m    at processImmediate (node:internal/timers:472:9)[39m
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.test.ts:224:5
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:20
+
+ [32m✓[39m src/lib/localDb.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 135[2mms[22m[39m
+ [32m✓[39m src/lib/geocoder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1583[2mms[22m[39m
+     [33m[2m✓[22m[39m returns null when the network request fails [33m 1575[2mms[22m[39m
+ [32m✓[39m src/hooks/useToasts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+[90mstderr[2m | src/hooks/useAuth.test.ts[2m > [22m[2museAuth — supabase mode[2m > [22m[2mcaptures error and 
+clears user when init throws
+[22m[39mAuth init failed Error: boom
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.test.ts:69:13
+    at Mock [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/spy[24m/dist/i
+ndex.js:332:34[90m)[39m
+    at getSupabase (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.test.ts:10:22)
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.ts:27:20
+
+ [32m✓[39m src/hooks/useUserRole.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 211[2mms[22m[39m
+ [32m✓[39m src/hooks/useAuth.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 196[2mms[22m[39m
+ [32m✓[39m src/components/ErrorBoundary.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 310[2mms[22m[39m
+ [32m✓[39m src/lib/exportIcs.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+ [32m✓[39m src/hooks/useKeyboardShortcuts.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 107[2mms[22m[39m
+ [32m✓[39m src/components/ModalShell.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 400[2mms[22m[39m
+ [32m✓[39m src/components/SettingsModal.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 1045[2mms[22m[39m
+     [33m[2m✓[22m[39m renders inside ModalShell with role="dialog" [33m 456[2mms[22m[39m
+ [32m✓[39m src/hooks/usePersistedCurrentDate.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m src/hooks/usePersistedSelectedMembers.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 74[2mms[22m[39m
+ [32m✓[39m src/hooks/useTheme.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 38[2mms[22m[39m
+ [32m✓[39m src/lib/timezoneOptions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError swallows 
+non-Error throws
+[22m[39m[reportError] Error: boom
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.test.ts:17:17
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError forwards context 
+tags
+[22m[39m[reportError] Error: tagged
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.test.ts:22:17
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 { tags: { feature: [32m'events'[39m } }
+
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError handles string 
+errors too
+[22m[39m[reportError] oops [90mundefined[39m
+
+ [32m✓[39m src/lib/errorReporting.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+ [32m✓[39m src/components/AddEventModal.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[33m 1571[2mms[22m[39m
+     [33m[2m✓[22m[39m renders inside ModalShell with role="dialog" [33m 375[2mms[22m[39m
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncInsert[2m > [22m[2mqueues on insert error
+[22m[39mDirect sync insert failed, queued for retry: { message: [32m'fail'[39m }
+
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncUpdate[2m > [22m[2mqueues on update error
+[22m[39mDirect sync update failed, queued for retry: { message: [32m'fail'[39m }
+
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncDelete[2m > [22m[2mqueues on delete error
+[22m[39mDirect sync delete failed, queued for retry: { message: [32m'fail'[39m }
+
+ [32m✓[39m src/lib/syncEngine.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m src/components/EventDetailModal.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 758[2mms[22m[39m
+     [33m[2m✓[22m[39m renders inside ModalShell with role="dialog" [33m 331[2mms[22m[39m
+ [32m✓[39m src/hooks/useFocusTrap.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+ [32m✓[39m src/lib/colorSchemes.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32m✓[39m src/hooks/useCustomDragPreview.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError handles non-Error values (number)
+[22m[39m[reportError] [33m42[39m [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError handles null
+[22m[39m[reportError] [1mnull[22m [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError passes through tags + extra + user context
+[22m[39m[reportError] Error: ctx
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.branches.test.ts:36:30
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 {
+  tags: { feature: [32m'events'[39m },
+  extra: { hint: [32m'clicked save'[39m },
+  user: { id: [32m'u1'[39m }
+}
+
+ [32m✓[39m src/lib/errorReporting.branches.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/lib/icsImport.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/lib/i18n.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mgetSupabase[2m > [22m[2mreturns null when env vars are 
+unset (local-only mode)
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mgetSupabase[2m > [22m[2mreturns null when URL is malformed
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignInWithGoogle throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignInWithEmail throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignUpWithEmail throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignOut returns Promise.resolve 
+when supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+ [32m✓[39m src/lib/supabase.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32m✓[39m src/components/CalendarAccessibility.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 809[2mms[22m[39m
+     [33m[2m✓[22m[39m opens a month day from the keyboard [33m 462[2mms[22m[39m
+ [32m✓[39m src/lib/undoStack.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/lib/utils.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+[90mstderr[2m | src/lib/pushNotifications.test.ts[2m > [22m[2msubscribeToPush[2m > [22m[2mreturns null when 
+VAPID key is missing
+[22m[39mVAPID public key not configured
+
+ [32m✓[39m src/lib/pushNotifications.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/lib/recurrenceTemplates.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+[90mstderr[2m | src/App.persistenceIsolation.test.tsx
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+Valid Supabase credentials not found. App will run in local-only mode.
+
+ [32m✓[39m src/App.persistenceIsolation.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 441[2mms[22m[39m
+     [33m[2m✓[22m[39m switches IndexedDB scope when the authenticated account changes and clears signed-out cache [33m 436[2mms[22m[39m
+ [32m✓[39m src/lib/permissions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/weather.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/lib/dstDetector.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/eventSearch.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/lib/emojiPicker.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+[90mstderr[2m | src/App.realtime.test.tsx[2m > [22m[2mApp realtime cleanup[2m > [22m[2mremoves the previous 
+channel on user change and on unmount
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+Valid Supabase credentials not found. App will run in local-only mode.
+Valid Supabase credentials not found. App will run in local-only mode.
+Valid Supabase credentials not found. App will run in local-only mode.
+
+ [32m✓[39m src/lib/pushNotificationSecurity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/App.realtime.test.tsx [2m([22m[2m1 test[22m[2m)[22m[33m 1491[2mms[22m[39m
+     [33m[2m✓[22m[39m removes the previous channel on user change and on unmount [33m 1486[2mms[22m[39m
+ [32m✓[39m src/lib/sounds.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/rbac.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/lib/voiceInput.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/easterEggs.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/rlsPolicy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/icsSubscription.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/lib/birthdays.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/timezone.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/dateLocale.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m

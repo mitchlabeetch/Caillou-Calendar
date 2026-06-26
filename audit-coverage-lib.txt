@@ -1,0 +1,257 @@
+﻿
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90mC:/Users/tanag/Desktop/Caillou/Caillou-Calendar[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [32m✓[39m src/lib/colorSchemes.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/lib/googleCalendar.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 47[2mms[22m[39m
+node.exe : Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+In Zeile:1 Zeichen:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Not implemented...vas npm package:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+ [32m✓[39m src/lib/confetti.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 158[2mms[22m[39m
+ [32m✓[39m src/lib/timezoneOptions.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+[90mstderr[2m | src/lib/localDb.test.ts[2m > [22m[2mflushOutboundSyncQueue[2m > [22m[2mskips an item that 
+throws and continues
+[22m[39mSync queue item failed, will retry: {
+  table: [32m'events'[39m,
+  operation: [32m'insert'[39m,
+  payload: { id: [32m'a'[39m },
+  timestamp: [33m1782482229411[39m,
+  id: [33m8[39m
+} Error: boom
+    at Object.<anonymous> (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.test.ts:217:42)
+    at Object.Mock [as insert] [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vit
+est/spy[24m/dist/index.js:332:34[90m)[39m
+    at Module.flushOutboundSyncQueue (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.ts:195:61)
+[90m    at runNextTicks (node:internal/process/task_queues:65:5)[39m
+[90m    at processImmediate (node:internal/timers:472:9)[39m
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/localDb.test.ts:224:5
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:20
+
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError handles non-Error values (number)
+[22m[39m[reportError] [33m42[39m [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError handles null
+[22m[39m[reportError] [1mnull[22m [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.branches.test.ts[2m > [22m[2merrorReporting — DSN-driven paths[2m > 
+[22m[2mreportError passes through tags + extra + user context
+[22m[39m[reportError] Error: ctx
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.branches.test.ts:36:30
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 {
+  tags: { feature: [32m'events'[39m },
+  extra: { hint: [32m'clicked save'[39m },
+  user: { id: [32m'u1'[39m }
+}
+
+ [32m✓[39m src/lib/localDb.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m src/lib/errorReporting.branches.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError swallows 
+non-Error throws
+[22m[39m[reportError] Error: boom
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.test.ts:17:17
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 [90mundefined[39m
+
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError forwards context 
+tags
+[22m[39m[reportError] Error: tagged
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/lib/errorReporting.test.ts:22:17
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:302:11
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:1903:26
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runne
+r[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/runner[24m/dist/chun
+k-artifact.js:2955:64 { tags: { feature: [32m'events'[39m } }
+
+[90mstderr[2m | src/lib/errorReporting.test.ts[2m > [22m[2minitSentry[2m > [22m[2mreportError handles string 
+errors too
+[22m[39m[reportError] oops [90mundefined[39m
+
+ [32m✓[39m src/lib/errorReporting.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncInsert[2m > [22m[2mqueues on insert error
+[22m[39mDirect sync insert failed, queued for retry: { message: [32m'fail'[39m }
+
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncUpdate[2m > [22m[2mqueues on update error
+[22m[39mDirect sync update failed, queued for retry: { message: [32m'fail'[39m }
+
+[90mstderr[2m | src/lib/syncEngine.test.ts[2m > [22m[2msyncDelete[2m > [22m[2mqueues on delete error
+[22m[39mDirect sync delete failed, queued for retry: { message: [32m'fail'[39m }
+
+ [32m✓[39m src/lib/syncEngine.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32m✓[39m src/lib/geocoder.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 1262[2mms[22m[39m
+     [33m[2m✓[22m[39m returns null when the network request fails [33m 1254[2mms[22m[39m
+ [32m✓[39m src/hooks/useUserRole.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 209[2mms[22m[39m
+ [32m✓[39m src/hooks/usePersistedSelectedMembers.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/hooks/usePersistedCurrentDate.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m src/hooks/useTheme.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m src/hooks/useToasts.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 69[2mms[22m[39m
+ [32m✓[39m src/hooks/useFocusTrap.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+[90mstderr[2m | src/hooks/useAuth.test.ts[2m > [22m[2museAuth — supabase mode[2m > [22m[2mcaptures error and 
+clears user when init throws
+[22m[39mAuth init failed Error: boom
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.test.ts:69:13
+    at Mock [90m(file:///C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/[39mnode_modules/[4m@vitest/spy[24m/dist/i
+ndex.js:332:34[90m)[39m
+    at getSupabase (C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.test.ts:10:22)
+    at C:/Users/tanag/Desktop/Caillou/Caillou-Calendar/src/hooks/useAuth.ts:27:20
+
+ [32m✓[39m src/hooks/useAuth.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m src/lib/exportIcs.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+ [32m✓[39m src/hooks/useCustomDragPreview.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m src/lib/icsImport.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/lib/i18n.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/hooks/useKeyboardShortcuts.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 81[2mms[22m[39m
+ [32m✓[39m src/lib/utils.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mgetSupabase[2m > [22m[2mreturns null when env vars are 
+unset (local-only mode)
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mgetSupabase[2m > [22m[2mreturns null when URL is malformed
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignInWithGoogle throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignInWithEmail throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignUpWithEmail throws when 
+supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+[90mstderr[2m | src/lib/supabase.test.ts[2m > [22m[2mauth helpers[2m > [22m[2msignOut returns Promise.resolve 
+when supabase is unconfigured
+[22m[39mValid Supabase credentials not found. App will run in local-only mode.
+
+ [32m✓[39m src/lib/supabase.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+[90mstderr[2m | src/lib/pushNotifications.test.ts[2m > [22m[2msubscribeToPush[2m > [22m[2mreturns null when 
+VAPID key is missing
+[22m[39mVAPID public key not configured
+
+ [32m✓[39m src/lib/pushNotifications.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32m✓[39m src/lib/localeParity.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/lib/eventValidation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/lib/recurrenceTemplates.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/lib/weather.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m src/lib/undoStack.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/lib/emojiPicker.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/lib/permissions.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/lib/dstDetector.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/sounds.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/pushNotificationSecurity.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/eventSearch.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/lib/rbac.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/lib/icsSubscription.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/lib/easterEggs.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/rlsPolicy.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/lib/voiceInput.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m src/lib/birthdays.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/timezone.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32m✓[39m src/lib/dateLocale.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m43 passed[39m[22m[90m (43)[39m
+[2m      Tests [22m [1m[32m258 passed[39m[22m[90m (258)[39m
+[2m   Start at [22m 15:57:02
+[2m   Duration [22m 20.19s[2m (transform 3.03s, setup 10.73s, import 45.82s, tests 2.73s, environment 213.05s)[22m
+
+[34m % [39m[2mCoverage report from [22m[33mv8[39m
+-------------------|---------|----------|---------|---------|-------------------
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+-------------------|---------|----------|---------|---------|-------------------
+All files          |   77.69 |     68.7 |   83.33 |   81.17 |                   
+ hooks             |   75.16 |    63.47 |   81.66 |   78.92 |                   
+  useAuth.ts       |    70.9 |    42.85 |      75 |   75.51 | 40-49,54-55,76-83 
+  ...ragPreview.ts |     100 |    83.33 |     100 |     100 | 40                
+  useFocusTrap.ts  |   14.28 |     3.57 |      40 |    14.7 | 26-58,67-70       
+  useIsMobile.ts   |       0 |      100 |       0 |       0 | 3-12              
+  ...dShortcuts.ts |   98.11 |    95.12 |     100 |     100 | 26,43             
+  ...urrentDate.ts |     100 |      100 |     100 |     100 |                   
+  ...tedMembers.ts |     100 |      100 |     100 |     100 |                   
+  useTheme.ts      |   78.78 |    68.42 |   85.71 |    86.2 | 30,39-41          
+  useToasts.ts     |     100 |    77.77 |     100 |     100 | 33-38             
+  useUserRole.ts   |   84.84 |    84.21 |     100 |      90 | 50-53             
+ lib               |   78.38 |    69.89 |    83.9 |   81.78 |                   
+  birthdays.ts     |   88.88 |    77.41 |     100 |     100 | 28-44             
+  colorSchemes.ts  |   86.95 |       70 |     100 |     100 | 64,70-72          
+  confetti.ts      |   66.66 |       60 |      80 |   69.04 | 47-61             
+  dateLocale.ts    |     100 |    91.66 |     100 |     100 | 4                 
+  dstDetector.ts   |     100 |      100 |     100 |     100 |                   
+  easterEggs.ts    |   71.42 |       50 |     100 |   83.33 | 16                
+  emojiPicker.ts   |     100 |      100 |     100 |     100 |                   
+  ...rReporting.ts |   54.54 |       30 |     100 |      50 | 38,47-60,72-73    
+  eventSearch.ts   |      88 |    88.88 |      75 |    90.9 | 40-41             
+  ...Validation.ts |   87.09 |    81.81 |     100 |   89.65 | ...03,106,119,121 
+  exportIcs.ts     |   82.45 |     62.5 |   66.66 |   87.03 | 32,67,85,90-95    
+  geocoder.ts      |      50 |       60 |     100 |   46.15 | 27-40             
+  ...leCalendar.ts |      89 |    73.61 |    92.3 |   91.95 | ...23,227,234,243 
+  i18n.ts          |     100 |      100 |     100 |     100 |                   
+  icsImport.ts     |   87.32 |       75 |     100 |   92.18 | 43,53-56          
+  ...bscription.ts |   57.14 |       75 |      50 |   57.14 | 27-30             
+  localDb.ts       |   90.22 |    65.85 |   95.65 |   93.04 | 82-86,222-224     
+  ...horization.ts |      80 |    61.53 |     100 |      80 | 10,36,45          
+  permissions.ts   |   94.73 |       90 |     100 |    90.9 | 10                
+  ...onSecurity.ts |     100 |      100 |     100 |     100 |                   
+  ...ifications.ts |     100 |       75 |     100 |     100 | 30,47-49          
+  rbac.ts          |    62.5 |    38.46 |     100 |   66.66 | 126,128-134       
+  ...eTemplates.ts |    91.3 |       70 |     100 |   94.44 | 138               
+  sounds.ts        |   43.63 |       60 |   54.54 |      50 | 18-19,43-52,63-73 
+  supabase.ts      |   83.72 |    85.18 |     100 |   81.25 | ...06,117,123,129 
+  syncActions.ts   |       0 |        0 |       0 |       0 | 11-31             
+  syncEngine.ts    |      75 |    66.15 |   85.71 |    77.5 | ...46,67-71,77-82 
+  timezone.ts      |   81.81 |       75 |   66.66 |      80 | 30,42             
+  ...oneOptions.ts |     100 |    83.33 |     100 |     100 | 47                
+  undoStack.ts     |     100 |    66.66 |     100 |     100 | 38-48             
+  utils.ts         |     100 |       80 |     100 |     100 | 12-15             
+  voiceInput.ts    |    42.5 |    31.57 |   22.22 |   51.61 | ...6,89-90,96-104 
+  weather.ts       |   33.33 |    15.62 |      50 |   37.14 | 43-77             
+-------------------|---------|----------|---------|---------|-------------------

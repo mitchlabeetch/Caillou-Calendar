@@ -11,7 +11,7 @@ import { WeatherChip } from './WeatherChip';
 
 export function EventDetailModal({ isOpen, onClose, eventId }: { isOpen: boolean, onClose: () => void, eventId: string }) {
   const { t } = useTranslation();
-  const { events, deleteEvent, setEvents, familyMembers, userRole, user } = useEvents();
+  const { events, deleteEvent, updateEvent, familyMembers, userRole, user } = useEvents();
   const event = events.find(e => e.id === eventId);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -47,19 +47,17 @@ export function EventDetailModal({ isOpen, onClose, eventId }: { isOpen: boolean
 
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTitle || !editDate || editMembers.length === 0) return;
 
-    setEvents(evs => evs.map(ev =>
-      ev.id === event.id ? {
-        ...ev,
-        title: editTitle,
-        date: editDate,
-        startTime: editTime || undefined,
-        memberIds: editMembers
-      } : ev
-    ));
+    const didUpdateEvent = await updateEvent(event.id, {
+      title: editTitle,
+      date: editDate,
+      startTime: editTime || undefined,
+      memberIds: editMembers,
+    });
+    if (!didUpdateEvent) return;
     setIsEditing(false);
   };
 
@@ -229,16 +227,15 @@ export function EventDetailModal({ isOpen, onClose, eventId }: { isOpen: boolean
               <div className="flex gap-4">
                 {canEdit && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       const next = prompt(t('app.moveToPrompt', 'Move to (YYYY-MM-DD):'), event.date);
                       if (!next) return;
                       if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) {
                         alert(t('app.invalidDate', 'Invalid date format. Use YYYY-MM-DD.'));
                         return;
                       }
-                      setEvents(evs => evs.map(ev =>
-                        ev.id === event.id ? { ...ev, date: next } : ev
-                      ));
+                      const didMoveEvent = await updateEvent(event.id, { date: next });
+                      if (!didMoveEvent) return;
                       onClose();
                     }}
                     className="flex-1 h-14 bg-surface border-[3px] border-ink shadow-neo rounded-xl font-bold flex items-center justify-center gap-2 hover:-translate-y-1 hover:shadow-neo-hover active:translate-y-1 active:shadow-none transition-all"

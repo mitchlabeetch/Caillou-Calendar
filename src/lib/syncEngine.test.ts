@@ -72,6 +72,22 @@ describe('syncInsert', () => {
     await syncInsert('events', { id: 'e1' });
     expect(await localDb.getOutboundQueue()).toHaveLength(0);
   });
+
+  it('does not queue authorization failures', async () => {
+    const insert = vi.fn(() => Promise.resolve({
+      error: { code: '42501', message: 'new row violates row-level security policy' },
+    }));
+    (getSupabase as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
+      from: () => ({ insert }),
+    });
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+    await expect(syncInsert('events', { id: 'e1' })).rejects.toMatchObject({
+      name: 'MutationAuthorizationError',
+    });
+    expect(await localDb.getOutboundQueue()).toHaveLength(0);
+  });
 });
 
 describe('syncUpdate', () => {
@@ -108,6 +124,22 @@ describe('syncUpdate', () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     await syncUpdate('events', 'e1', { title: 'x' });
     expect(await localDb.getOutboundQueue()).toHaveLength(1);
+  });
+
+  it('does not queue authorization failures', async () => {
+    const update = vi.fn(() => ({
+      eq: () => ({ eq: () => Promise.resolve({ error: { code: '42501', message: 'blocked by rls' } }) }),
+    }));
+    (getSupabase as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
+      from: () => ({ update }),
+    });
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+    await expect(syncUpdate('events', 'e1', { title: 'x' })).rejects.toMatchObject({
+      name: 'MutationAuthorizationError',
+    });
+    expect(await localDb.getOutboundQueue()).toHaveLength(0);
   });
 });
 
@@ -155,5 +187,21 @@ describe('syncDelete', () => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
     await syncDelete('events', 'e1');
     expect(await localDb.getOutboundQueue()).toHaveLength(1);
+  });
+
+  it('does not queue delete authorization failures', async () => {
+    const del = vi.fn(() => ({
+      eq: () => ({ eq: () => Promise.resolve({ error: { code: '42501', message: 'blocked by rls' } }) }),
+    }));
+    (getSupabase as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      auth: { getUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) },
+      from: () => ({ delete: del }),
+    });
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+    await expect(syncDelete('events', 'e1')).rejects.toMatchObject({
+      name: 'MutationAuthorizationError',
+    });
+    expect(await localDb.getOutboundQueue()).toHaveLength(0);
   });
 });

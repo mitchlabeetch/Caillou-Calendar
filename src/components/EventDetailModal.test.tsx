@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EventDetailModal } from './EventDetailModal';
 import { EventsContext, EventsContextType } from '../lib/eventsContext';
 import { CalendarEvent, FamilyMember, AppSettings } from '../types';
@@ -8,6 +8,14 @@ vi.mock('../lib/syncEngine', () => ({
   syncInsert: vi.fn(() => Promise.resolve()),
   syncUpdate: vi.fn(() => Promise.resolve()),
   syncDelete: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('./WeatherChip', () => ({
+  WeatherChip: () => <div data-testid="weather-chip" />,
+}));
+
+vi.mock('./MapPreviewCard', () => ({
+  MapPreviewCard: () => <div data-testid="map-preview-card" />,
 }));
 
 const sampleFamily: FamilyMember[] = [
@@ -30,6 +38,9 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
   return {
     events: [baseEvent],
     setEvents: vi.fn(),
+    addEvent: vi.fn(() => Promise.resolve(true)),
+    addEvents: vi.fn(() => Promise.resolve(true)),
+    updateEvent: vi.fn(() => Promise.resolve(true)),
     deleteEvent: vi.fn(),
     moveEvent: vi.fn(),
     swapEvents: vi.fn(),
@@ -56,6 +67,10 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
     userRole: 'admin',
     user: { uid: 'u-admin', email: 'admin@example.com' },
     ...overrides,
+  } as unknown as EventsContextType & {
+    addEvent: ReturnType<typeof vi.fn>;
+    addEvents: ReturnType<typeof vi.fn>;
+    updateEvent: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -112,6 +127,28 @@ describe('EventDetailModal integration + RBAC', () => {
     fireEvent.click(deleteBtn);
     expect(deleteEvent).toHaveBeenCalledWith('evt-1');
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('saves edits through updateEvent instead of the raw state setter', async () => {
+    const updateEvent = vi.fn(() => Promise.resolve(true));
+    const setEvents = vi.fn();
+    renderModal(makeContext({ updateEvent, setEvents } as any));
+
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+    fireEvent.change(screen.getByDisplayValue('Soccer Practice'), {
+      target: { value: 'Updated Practice' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: /save changes/i }).closest('form') as HTMLFormElement);
+
+    await waitFor(() => {
+      expect(updateEvent).toHaveBeenCalledWith('evt-1', {
+        title: 'Updated Practice',
+        date: '2026-06-25',
+        startTime: '10:00',
+        memberIds: ['m1', 'm2'],
+      });
+    });
+    expect(setEvents).not.toHaveBeenCalled();
   });
 
   it('does not render when eventId is unknown', () => {

@@ -23,7 +23,14 @@ vi.mock('./lib/localDb', () => {
   const family = new Map();
   const places = new Map();
   let settings: any = undefined;
+  let activeScope = 'local-user';
   return {
+    setActiveStorageScope: vi.fn((scope: string) => {
+      activeScope = scope;
+      return Promise.resolve();
+    }),
+    getActiveStorageScope: vi.fn(() => activeScope),
+    clearStorageScope: vi.fn(() => Promise.resolve()),
     localDb: {
       getEvents: vi.fn(() => Promise.resolve(Array.from(events.values()))),
       setEvents: vi.fn((list: any[]) => {
@@ -143,6 +150,22 @@ describe('App integration', () => {
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeTruthy();
     });
+  });
+
+  it('exposes a single main landmark and a working skip link target', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('main')).toHaveLength(1);
+    });
+
+    const skipLink = screen.getByRole('link', { name: /skip to main content/i });
+    const main = screen.getByRole('main');
+
+    fireEvent.click(skipLink);
+
+    expect(main.getAttribute('id')).toBe('main-content');
+    expect(document.activeElement).toBe(main);
   });
 
   it('opens the SettingsModal and theme select applies', async () => {

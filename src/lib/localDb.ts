@@ -1,5 +1,6 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { CalendarEvent, FamilyMember, AppSettings } from '../types';
+import { isMutationAuthorizationError } from './mutationAuthorization';
 
 interface CaillouDB extends DBSchema {
   events: {
@@ -31,14 +32,37 @@ interface CaillouDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'caillou-calendar';
+const BASE_DB_NAME = 'caillou-calendar';
 const DB_VERSION = 1;
+const STORE_NAMES = ['events', 'family_members', 'places', 'settings', 'outbound_sync_queue'] as const;
+const DEFAULT_STORAGE_SCOPE = 'signed-out';
 
-let dbPromise: Promise<IDBPDatabase<CaillouDB>> | null = null;
+let activeStorageScope = DEFAULT_STORAGE_SCOPE;
+const dbPromises = new Map<string, Promise<IDBPDatabase<CaillouDB>>>();
 
-export const getDb = () => {
-  if (dbPromise) return dbPromise;
-  dbPromise = openDB<CaillouDB>(DB_NAME, DB_VERSION, {
+function normalizeStorageScope(scope?: string | null): string {
+  const normalized = scope?.trim();
+  return normalized ? normalized : DEFAULT_STORAGE_SCOPE;
+}
+
+function getScopedDbName(scope: string): string {
+  return `${BASE_DB_NAME}::${encodeURIComponent(scope)}`;
+}
+
+export const getActiveStorageScope = () => activeStorageScope;
+
+export const setActiveStorageScope = async (scope: string) => {
+  activeStorageScope = normalizeStorageScope(scope);
+  await getDb(activeStorageScope);
+};
+
+export const getDb = (scope = activeStorageScope) => {
+  const normalizedScope = normalizeStorageScope(scope);
+  const dbName = getScopedDbName(normalizedScope);
+  const existing = dbPromises.get(dbName);
+  if (existing) return existing;
+
+  const dbPromise = openDB<CaillouDB>(dbName, DB_VERSION, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('events')) db.createObjectStore('events', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('family_members')) db.createObjectStore('family_members', { keyPath: 'id' });
@@ -50,7 +74,17 @@ export const getDb = () => {
       }
     },
   });
+  dbPromises.set(dbName, dbPromise);
   return dbPromise;
+};
+
+export const clearStorageScope = async (scope = activeStorageScope) => {
+  const db = await getDb(scope);
+  for (const store of STORE_NAMES) {
+    const tx = db.transaction(store, 'readwrite');
+    await tx.store.clear();
+    await tx.done;
+  }
 };
 
 export const localDb = {
@@ -158,26 +192,37 @@ export const flushOutboundSyncQueue = async () => {
 
       switch (item.operation) {
         case 'insert': {
-          await supabase.from(item.table).insert([{ ...item.payload, owner_id: userId }]);
+          const { error } = await supabase.from(item.table).insert([{ ...item.payload, owner_id: userId }]);
+          if (error) throw error;
           break;
         }
         case 'update': {
           const { id, ...rest } = item.payload;
-          await supabase.from(item.table).update({ ...rest, owner_id: userId }).eq('id', id);
+          const result = item.table === 'settings'
+            ? await supabase.from(item.table).upsert({ ...rest, owner_id: userId })
+            : await supabase.from(item.table).update({ ...rest, owner_id: userId }).eq('id', id);
+          if (result.error) throw result.error;
           break;
         }
         case 'delete': {
           const id = item.payload.id;
           if (Array.isArray(id)) {
-            await supabase.from(item.table).delete().in('id', id);
+            const { error } = await supabase.from(item.table).delete().in('id', id);
+            if (error) throw error;
           } else {
-            await supabase.from(item.table).delete().eq('id', id);
+            const { error } = await supabase.from(item.table).delete().eq('id', id);
+            if (error) throw error;
           }
           break;
         }
       }
       succeeded.push(item.id);
     } catch (e) {
+      if (isMutationAuthorizationError(e)) {
+        console.warn('Dropping unauthorized sync queue item:', item, e);
+        succeeded.push(item.id);
+        continue;
+      }
       console.warn('Sync queue item failed, will retry:', item, e);
     }
   }

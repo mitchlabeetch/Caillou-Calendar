@@ -2,22 +2,21 @@
 import { useTranslation } from 'react-i18next';
 import { Globe, Sun, Bell, Layout, Clock, Palette, Volume2, Link2, Upload } from 'lucide-react';
 import { useEvents } from '../lib/eventsContext';
-import { subscribeToPush, unsubscribeFromPush, getPushSubscription } from '../lib/pushNotifications';
 import { useTheme } from '../hooks/useTheme';
 import { useUserRole } from '../hooks/useUserRole';
 import { ModalShell } from './ModalShell';
 import { TIMEZONE_OPTIONS, resolveActiveTimezone } from '../lib/timezoneOptions';
 import { COLOR_SCHEMES, setActiveColorScheme, getActiveColorScheme } from '../lib/colorSchemes';
-import { isSoundEnabled, setSoundEnabled, playCue } from '../lib/sounds';
 import { buildIcsSubscriptionUrl, copyToClipboard } from '../lib/icsSubscription';
 import { parseIcs, icsToEvents } from '../lib/icsImport';
-import { pushOp } from '../lib/undoStack';
+import { isMutationAuthorizationError } from '../lib/mutationAuthorization';
 
 export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { t, i18n } = useTranslation();
-  const { settings, updateSettings, setEvents } = useEvents();
+  const { settings, updateSettings, addEvents, showToast, user } = useEvents();
   const [theme, setTheme] = useTheme();
   const [userRole, setUserRole] = useUserRole();
+  const isTrustedRole = !!user && user.uid !== 'local-user';
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [timezone, setTimezone] = useState<string>(() => {
@@ -25,7 +24,9 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     return localStorage.getItem('synoptic-timezone') ?? 'auto';
   });
   const [schemeId, setSchemeId] = useState(() => getActiveColorScheme().id);
-  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [soundOn, setSoundOn] = useState(() =>
+    typeof localStorage !== 'undefined' && localStorage.getItem('synoptic-sound-enabled') === '1'
+  );
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [importState, setImportState] = useState<'idle' | 'ok' | 'fail'>('idle');
   const [importCount, setImportCount] = useState(0);
@@ -33,17 +34,18 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
   useEffect(() => {
     if (!isOpen) return;
-    getPushSubscription().then(sub => setPushEnabled(!!sub));
+    void import('../lib/pushNotifications').then(m => m.getPushSubscription()).then(sub => setPushEnabled(!!sub));
   }, [isOpen]);
 
   const togglePush = async () => {
     setPushLoading(true);
     try {
+      const push = await import('../lib/pushNotifications');
       if (pushEnabled) {
-        await unsubscribeFromPush();
+        await push.unsubscribeFromPush();
         setPushEnabled(false);
       } else {
-        const sub = await subscribeToPush();
+        const sub = await push.subscribeToPush();
         setPushEnabled(!!sub);
       }
     } catch (e) {
@@ -133,12 +135,18 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             aria-label={t('app.role', 'Role')}
             className="h-12 border-[2px] border-ink rounded-xl px-3 font-bold bg-bg-light outline-none cursor-pointer"
             value={userRole}
+            disabled={isTrustedRole}
             onChange={(e) => setUserRole(e.target.value as 'admin' | 'member' | 'child')}
           >
             <option value="admin">{t('app.admin', 'Admin')}</option>
             <option value="member">{t('app.member', 'Member')}</option>
             <option value="child">{t('app.child', 'Child')}</option>
           </select>
+          {isTrustedRole && (
+            <p className="text-[10px] opacity-50">
+              {t('app.roleManagedByServer', 'Signed-in account roles are managed by trusted backend rules.')}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">
@@ -206,8 +214,9 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           <button
             type="button"
             aria-pressed={soundOn}
-            onClick={() => {
+            onClick={async () => {
               const next = !soundOn;
+              const { setSoundEnabled, playCue } = await import('../lib/sounds');
               setSoundEnabled(next);
               setSoundOn(next);
               if (next) playCue('click');
@@ -265,13 +274,22 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   const text = await file.text();
                   const parsed = parseIcs(text);
                   const events = icsToEvents(parsed);
-                  setEvents(prev => [...prev, ...events]);
+                  const [sync, undo] = await Promise.all([
+                    import('../lib/syncEngine'),
+                    import('../lib/undoStack'),
+                  ]);
+                  await Promise.all(events.map((event) => sync.syncInsert('events', event)));
+                  const didImportEvents = await addEvents(events);
+                  if (!didImportEvents) return;
                   setImportCount(events.length);
                   setImportState('ok');
                   for (const ev of events) {
-                    pushOp({ type: 'add', eventId: ev.id, snapshot: ev });
+                    undo.pushOp({ type: 'add', eventId: ev.id, snapshot: ev });
                   }
-                } catch {
+                } catch (error) {
+                  if (isMutationAuthorizationError(error)) {
+                    showToast(t('app.permissionDenied', 'You are not allowed to perform this action.'));
+                  }
                   setImportState('fail');
                 } finally {
                   setTimeout(() => setImportState('idle'), 2500);

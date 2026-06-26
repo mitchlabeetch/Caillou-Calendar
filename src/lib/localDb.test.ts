@@ -6,7 +6,13 @@ vi.mock('./supabase', () => ({
   getSupabase: vi.fn(),
 }));
 
-import { localDb, flushOutboundSyncQueue, getDb } from './localDb';
+import {
+  localDb,
+  flushOutboundSyncQueue,
+  getDb,
+  getActiveStorageScope,
+  setActiveStorageScope,
+} from './localDb';
 import { getSupabase } from './supabase';
 import { CalendarEvent, FamilyMember, AppSettings } from '../types';
 
@@ -29,6 +35,7 @@ const baseMember: FamilyMember = {
 };
 
 beforeEach(async () => {
+  await setActiveStorageScope('signed-out');
   // Reset by clearing each store. The module caches the dbPromise
   // but `clearOutboundQueue` etc. just no-op when empty.
   const db = await getDb();
@@ -37,6 +44,29 @@ beforeEach(async () => {
     await tx.store.clear();
     await tx.done;
   }
+});
+
+describe('localDb — storage scopes', () => {
+  it('isolates cached records and outbound queue items per storage scope', async () => {
+    await setActiveStorageScope('user:alpha');
+    expect(getActiveStorageScope()).toBe('user:alpha');
+    await localDb.setEvents([baseEvent]);
+    await localDb.enqueueSync('events', 'insert', { id: 'alpha-queued' });
+
+    await setActiveStorageScope('user:bravo');
+    expect(await localDb.getEvents()).toEqual([]);
+    expect(await localDb.getOutboundQueue()).toEqual([]);
+
+    await localDb.setEvents([{ ...baseEvent, id: 'bravo-event', title: 'Bravo' }]);
+
+    await setActiveStorageScope('user:alpha');
+    expect((await localDb.getEvents()).map((event) => event.id)).toEqual(['e1']);
+    expect((await localDb.getOutboundQueue()).map((item) => item.payload.id)).toEqual(['alpha-queued']);
+
+    await setActiveStorageScope('user:bravo');
+    expect((await localDb.getEvents()).map((event) => event.id)).toEqual(['bravo-event']);
+    expect(await localDb.getOutboundQueue()).toEqual([]);
+  });
 });
 
 describe('localDb — events', () => {

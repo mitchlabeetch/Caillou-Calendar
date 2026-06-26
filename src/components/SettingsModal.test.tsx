@@ -19,6 +19,9 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
   return {
     events: [] as CalendarEvent[],
     setEvents: vi.fn(),
+    addEvent: vi.fn(() => Promise.resolve(true)),
+    addEvents: vi.fn(() => Promise.resolve(true)),
+    updateEvent: vi.fn(() => Promise.resolve(true)),
     deleteEvent: vi.fn(),
     moveEvent: vi.fn(),
     swapEvents: vi.fn(),
@@ -45,6 +48,10 @@ function makeContext(overrides: Partial<EventsContextType> = {}): EventsContextT
     userRole: 'admin',
     user: null,
     ...overrides,
+  } as unknown as EventsContextType & {
+    addEvent: ReturnType<typeof vi.fn>;
+    addEvents: ReturnType<typeof vi.fn>;
+    updateEvent: ReturnType<typeof vi.fn>;
   };
 }
 

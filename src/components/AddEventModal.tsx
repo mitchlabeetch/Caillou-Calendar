@@ -43,7 +43,7 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [listening, setListening] = useState(false);
 
-  const { setEvents, showToast, events, familyMembers } = useEvents();
+  const { addEvent, showToast, events, familyMembers } = useEvents();
   const [driverId, setDriverId] = useState<string>('');
   const templates = listTemplates();
 
@@ -139,7 +139,7 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
         initial="hidden"
         animate="visible"
         className="flex flex-col gap-4"
-        onSubmit={e => {
+        onSubmit={async e => {
           e.preventDefault();
           if (!title || !date || selectedMems.length === 0) return;
           const tagList = tagsInput
@@ -172,8 +172,8 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
             ...(driverId ? { driverId } : {}),
           };
 
-          import('../lib/syncEngine').then(s => s.syncInsert('events', newEvent));
-          setEvents(prev => [...prev, newEvent]);
+          const didCreateEvent = await addEvent(newEvent);
+          if (!didCreateEvent) return;
 
           // Polish: sound cue + undo stack hook + confetti for birthdays.
           import('../lib/sounds').then(m => m.playCue(newEvent.isBirthday ? 'birthday' : 'click'));
@@ -394,8 +394,16 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
         <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <label htmlFor="add-event-all-day" className="flex items-center gap-2 cursor-pointer group w-max">
+            <input
+              id="add-event-all-day"
+              type="checkbox"
+              className="peer sr-only"
+              checked={allDay}
+              onChange={e => { setAllDay(e.target.checked); if (e.target.checked) setTime(''); }}
+              aria-label={t('app.allDay', 'All day')}
+            />
             <div className={cn(
-              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm",
+              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2",
               allDay ? "bg-primary border-ink" : "bg-surface border-ink/40 group-hover:border-ink/80"
             )}>
               {allDay && (
@@ -404,19 +412,19 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                 </motion.div>
               )}
             </div>
-            <input
-              id="add-event-all-day"
-              type="checkbox"
-              className="hidden"
-              checked={allDay}
-              onChange={e => { setAllDay(e.target.checked); if (e.target.checked) setTime(''); }}
-              aria-label={t('app.allDay', 'All-day event')}
-            />
             <span className="font-bold text-sm text-ink/80 select-none">{t('app.allDay', 'All-day')}</span>
           </label>
           <label htmlFor="add-event-pinned" className="flex items-center gap-2 cursor-pointer group w-max">
+            <input
+              id="add-event-pinned"
+              type="checkbox"
+              className="peer sr-only"
+              checked={pinned}
+              onChange={e => setPinned(e.target.checked)}
+              aria-label={t('app.pinned', 'Pin to top')}
+            />
             <div className={cn(
-              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm",
+              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2",
               pinned ? "bg-primary border-ink" : "bg-surface border-ink/40 group-hover:border-ink/80"
             )}>
               {pinned && (
@@ -425,14 +433,6 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                 </motion.div>
               )}
             </div>
-            <input
-              id="add-event-pinned"
-              type="checkbox"
-              className="hidden"
-              checked={pinned}
-              onChange={e => setPinned(e.target.checked)}
-              aria-label={t('app.pinned', 'Pin to top of day')}
-            />
             <span className="font-bold text-sm text-ink/80 select-none">{t('app.pinned', 'Pin to top')}</span>
           </label>
         </motion.div>
@@ -485,8 +485,16 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
         <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
           <label htmlFor="add-event-birthday" className="flex items-center gap-2 cursor-pointer group w-max">
+            <input
+              id="add-event-birthday"
+              type="checkbox"
+              className="peer sr-only"
+              checked={isBirthday}
+              onChange={e => setIsBirthday(e.target.checked)}
+              aria-label={t('app.birthday', 'Mark as Birthday (Repeats Yearly)')}
+            />
             <div className={cn(
-              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm",
+              "w-5 h-5 rounded-md border-[2px] transition-all flex items-center justify-center relative shadow-neo-sm peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2",
               isBirthday ? "bg-primary border-ink" : "bg-surface border-ink/40 group-hover:border-ink/80"
             )}>
               {isBirthday && (
@@ -495,14 +503,6 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                 </motion.div>
               )}
             </div>
-            <input
-              id="add-event-birthday"
-              type="checkbox"
-              className="hidden"
-              checked={isBirthday}
-              onChange={e => setIsBirthday(e.target.checked)}
-              aria-label={t('app.birthday', 'Birthday (repeats yearly)')}
-            />
             <span className="font-bold text-sm text-ink/80 select-none">{t('app.birthday', 'Mark as Birthday (Repeats Yearly)')}</span>
           </label>
         </motion.div>
@@ -606,7 +606,7 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
         <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-widest text-ink/60">{t('app.who')}</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('app.who')}>
             {familyMembers.map(mem => {
               const isSel = selectedMems.includes(mem.id);
               return (
@@ -614,11 +614,12 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                   type="button"
                   key={mem.id}
                   onClick={() => setSelectedMems(s => s.includes(mem.id) ? s.filter(x => x !== mem.id) : [...s, mem.id])}
+                  aria-label={mem.name}
+                  aria-pressed={isSel}
                   className={cn(
                     "w-8 h-8 rounded-full border-[2px] border-ink transition-all flex items-center justify-center font-bold text-xs uppercase",
                     isSel ? mem.bgClass : "bg-bg-light text-ink/30 hover:bg-gray-200"
                   )}
-                  title={mem.name}
                 >
                   {mem.name[0]}
                 </button>
@@ -629,7 +630,7 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
         <motion.div variants={itemVariants} className="flex flex-col gap-1.5">
           <label className="text-xs font-black uppercase tracking-widest text-ink/60 flex items-center gap-1"><Car className="w-3 h-3"/> {t('app.driver', 'Driver')}</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('app.driver', 'Driver')}>
             {familyMembers.map(mem => {
               const isSel = driverId === mem.id;
               return (
@@ -637,11 +638,12 @@ export function AddEventModal({ isOpen, onClose }: { isOpen: boolean, onClose: (
                   type="button"
                   key={mem.id}
                   onClick={() => setDriverId(isSel ? '' : mem.id)}
+                  aria-label={mem.name}
+                  aria-pressed={isSel}
                   className={cn(
                     "px-3 h-8 rounded-full border-[2px] border-ink transition-all flex items-center justify-center font-bold text-xs uppercase",
                     isSel ? mem.bgClass : "bg-bg-light text-ink/30 hover:bg-gray-200"
                   )}
-                  title={mem.name}
                 >
                   {mem.name[0]}
                 </button>

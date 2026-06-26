@@ -11,7 +11,7 @@ import { EventHoverCard } from './EventHoverCard';
 
 export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
   const { t, i18n } = useTranslation();
-  const { events, setEvents, moveEvent, deleteEvent, swapEvents, selectedMembers, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, settings, droppedEventId, triggerDropAnimation } = useEvents();
+  const { events, addEvent, updateEvent, moveEvent, deleteEvent, swapEvents, selectedMembers, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, settings, droppedEventId, triggerDropAnimation } = useEvents();
 
   const startDate = startOfWeek(currentDate, { weekStartsOn: settings.startOfWeek as any });
   const endDate = endOfWeek(currentDate, { weekStartsOn: settings.startOfWeek as any });
@@ -77,20 +77,32 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
     return eventsByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
   };
 
+  const activateDay = (day: Date) => {
+    onDateClick?.(day);
+  };
+
   return (
-    <main className="flex-1 flex flex-col relative bg-bg-app p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
+    <section className="flex-1 flex flex-col relative bg-bg-app p-1.5 sm:p-2 h-full min-h-0 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden rounded-xl sm:rounded-3xl shadow-neo-sm sm:shadow-neo border-[2px] sm:border-[4px] border-ink bg-surface relative">
         <div className="flex flex-col h-full min-w-[500px] md:min-w-[700px]">
           <div className="grid grid-cols-[30px_repeat(7,1fr)] sm:grid-cols-8 border-b-[2px] sm:border-b-[4px] border-ink shrink-0 bg-surface rounded-t-xl sm:rounded-t-3xl">
             <div className="flex items-end justify-center pb-2 text-ink/50 text-[10px] sm:text-xs font-bold uppercase border-r-[2px] sm:border-r-[4px] border-ink pt-2 sm:pt-3">{t('app.time')}</div>
             {days.map((day) => (
-              <div 
+              <button 
+                type="button"
                 key={day.toString()} 
                 className={cn(
                   "flex flex-col items-center border-r-[2px] sm:border-r-[4px] border-ink last:border-r-0 pt-2 sm:pt-3 pb-1 sm:pb-2 cursor-pointer transition-colors relative",
                   isSameDay(day, currentDate) ? "bg-primary/5 shadow-[inset_0_0_10px_rgba(0,0,0,0.05)] border-b-[2px] sm:border-b-[4px] border-b-primary z-10" : "hover:bg-black/5"
                 )}
-                onClick={() => onDateClick?.(day)}
+                aria-label={format(day, 'PPPP', dateOptions)}
+                onClick={() => activateDay(day)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activateDay(day);
+                  }
+                }}
               >
                 <span className="text-[10px] sm:text-xs font-black text-ink uppercase opacity-60">{format(day, 'EEE', dateOptions)}</span>
                 <span className={cn(
@@ -99,7 +111,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                 )}>
                   {format(day, 'd')}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -121,8 +133,8 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                   <button
                     key={ev.id}
                     onClick={() => setSelectedEventId(ev.id)}
+                    aria-label={[ev.title, t('app.allDay', 'All day'), format(day, 'PPPP', dateOptions)].join(', ')}
                     className="text-left text-[8px] sm:text-[10px] font-bold truncate bg-primary/20 border-l-[3px] border-primary px-1 rounded-sm hover:bg-primary/30 transition-colors"
-                    title={ev.title}
                   >
                     {ev.title}
                   </button>
@@ -264,6 +276,12 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                          const activeMem = familyMembers.find(m => evt.memberIds[0] === m.id);
                          const widthPercent = 100 / cols.length;
                          const leftPercent = colIdx * widthPercent;
+                         const eventLabel = [
+                           evt.title,
+                           evt.startTime,
+                           evt.endTime ? `to ${evt.endTime}` : null,
+                           format(day, 'PPPP', dateOptions),
+                         ].filter(Boolean).join(', ');
                          
                          const isSelected = selectedEventIdsForDelete.includes(evt.id);
 
@@ -312,6 +330,20 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                                  setSelectedEventId(evt.id);
                                }
                              }}
+                             onKeyDown={(e) => {
+                               if (e.key === 'Enter' || e.key === ' ') {
+                                 e.preventDefault();
+                                 e.stopPropagation();
+                                 if (isMultiSelectMode) {
+                                   toggleEventSelectionForDelete(evt.id);
+                                 } else {
+                                   setSelectedEventId(evt.id);
+                                 }
+                               }
+                             }}
+                             role="button"
+                             tabIndex={0}
+                             aria-label={eventLabel}
                              className={cn(
                                "absolute rounded-lg sm:rounded-xl border-[2px] sm:border-[3px] p-1 sm:p-2 shadow-neo-sm sm:shadow-neo cursor-pointer transition-transform hover:scale-[1.02] hover:z-50 group overflow-visible flex flex-col items-start justify-start text-left",
                                activeMem?.bgClass || "bg-surface text-ink",
@@ -328,13 +360,15 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                              }}
                            >
                               {cols.length > 1 && (
-                                <div className="absolute top-1 right-1 opacity-60 z-10 w-5 h-5 flex items-center justify-center bg-white/20 border border-ink/10 rounded-md pointer-events-none group-hover:opacity-0 transition-opacity backdrop-blur-sm" title="Overlapping event">
+                               <div className="absolute top-1 right-1 opacity-60 z-10 w-5 h-5 flex items-center justify-center bg-white/20 border border-ink/10 rounded-md pointer-events-none group-hover:opacity-0 transition-opacity backdrop-blur-sm" aria-hidden="true">
                                   <Layers className="w-3 h-3" />
                                 </div>
                               )}
                               {!isMultiSelectMode && (
                                 <button 
                                   onClick={(e) => { e.stopPropagation(); deleteEvent(evt.id); }}
+                                  type="button"
+                                  aria-label={`${t('app.delete', 'Delete')} ${evt.title}`}
                                   className="absolute top-1 right-1 w-5 h-5 bg-red-400 text-white rounded-full border-[2px] border-ink opacity-0 group-hover:opacity-100 flex items-center justify-center z-20 transition-all hover:scale-110 shrink-0"
                                 >
                                   <X className="w-3 h-3" />
@@ -381,12 +415,12 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                                       target.removeEventListener('pointermove', handlePointerMove);
                                       target.removeEventListener('pointerup', handlePointerUp);
                                       
-                                      setResizingEvent(current => {
+                                      void setResizingEvent(current => {
                                         if (current && current.id === evt.id) {
                                           const hrs = Math.floor(current.newEndMins / 60);
                                           const mins = current.newEndMins % 60;
                                           const newEndTime = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
-                                          setEvents(prev => prev.map(e => e.id === evt.id ? { ...e, endTime: newEndTime } : e));
+                                          void updateEvent(evt.id, { endTime: newEndTime });
                                         }
                                         return null;
                                       });
@@ -446,7 +480,7 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                       className="w-full bg-transparent outline-none font-black text-xs sm:text-sm text-ink placeholder:text-ink/40 focus:ring-2 focus:ring-primary focus:border-primary border-transparent rounded px-1 transition-all"
                       value={quickAddTitle}
                       onChange={e => setQuickAddTitle(e.target.value)}
-                      onKeyDown={e => {
+                      onKeyDown={async e => {
                         if (e.key === 'Enter' && quickAddTitle.trim()) {
                            const newEvent: CalendarEvent = {
                              id: Math.random().toString(36).substring(7),
@@ -457,7 +491,8 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
                              recurrence: { type: 'none' },
                              reminders: []
                            };
-                           setEvents(prev => [...prev, newEvent]);
+                           const didCreateEvent = await addEvent(newEvent);
+                           if (!didCreateEvent) return;
                            setQuickAdd(null);
                            setQuickAddTitle('');
                         } else if (e.key === 'Escape') {
@@ -479,6 +514,6 @@ export function CalendarWeek({ currentDate, onDateClick }: { currentDate: Date, 
       </div>
       </div>
       </div>
-    </main>
+    </section>
   );
 }

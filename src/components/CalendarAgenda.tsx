@@ -39,7 +39,7 @@ export function CalendarAgenda({ onDateClick }: { currentDate: Date; onDateClick
   };
 
   return (
-    <main className="flex-1 flex flex-col bg-bg-app p-3 overflow-y-auto">
+    <section className="flex-1 flex flex-col bg-bg-app p-3 overflow-y-auto">
       {sortedDates.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center opacity-80">
           <h4 className="text-xl font-display font-bold mb-2">{t('app.noEventsToday')}</h4>
@@ -69,10 +69,22 @@ export function CalendarAgenda({ onDateClick }: { currentDate: Date; onDateClick
                 {grouped[dateStr].map(evt => {
                   const mem = familyMembers.find(m => evt.memberIds[0] === m.id);
                   return (
-                    <motion.div
+                    <motion.button
+                      type="button"
                       key={evt.id}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setSelectedEventId(evt.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedEventId(evt.id);
+                        }
+                      }}
+                      aria-label={[
+                        evt.title,
+                        evt.startTime,
+                        format(parseISO(dateStr), 'PPPP', dateOptions),
+                      ].filter(Boolean).join(', ')}
                       className={cn(
                         "p-4 rounded-xl border-[3px] border-ink shadow-neo flex flex-col gap-1",
                         mem?.bgClass || "bg-surface"
@@ -97,12 +109,12 @@ export function CalendarAgenda({ onDateClick }: { currentDate: Date; onDateClick
                             <div
                               key={mid}
                               className={cn("w-5 h-5 rounded-full border border-ink", m.bgClass)}
-                              title={m.name}
+                              aria-label={m.name}
                             />
                           );
                         })}
                       </div>
-                    </motion.div>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -110,6 +122,6 @@ export function CalendarAgenda({ onDateClick }: { currentDate: Date; onDateClick
           ))}
         </div>
       )}
-    </main>
+    </section>
   );
 }

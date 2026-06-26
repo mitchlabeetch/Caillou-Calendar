@@ -1,9 +1,11 @@
-import React, { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 import { CalendarEvent, FamilyMember, Place, AppSettings, UserRole } from '../types';
 
 export interface EventsContextType {
   events: CalendarEvent[];
-  setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+  addEvent: (event: CalendarEvent) => Promise<boolean>;
+  addEvents: (events: CalendarEvent[]) => Promise<boolean>;
+  updateEvent: (id: string, updates: Partial<CalendarEvent>) => Promise<boolean>;
   deleteEvent: (id: string) => void;
   moveEvent: (id: string, newDate: string, newTime?: string) => void;
   swapEvents: (idA: string, idB: string) => void;

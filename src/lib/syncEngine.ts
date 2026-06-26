@@ -1,6 +1,10 @@
 import { localDb, flushOutboundSyncQueue } from './localDb';
 import { getSupabase, eventToDbRow, memberToDbRow, settingsToDbRow } from './supabase';
 import type { CalendarEvent, FamilyMember, AppSettings } from '../types';
+import {
+  asMutationAuthorizationError,
+  isMutationAuthorizationError,
+} from './mutationAuthorization';
 
 export type SyncTable = 'events' | 'family_members' | 'places' | 'settings';
 
@@ -95,6 +99,9 @@ export const syncInsert = async (table: SyncTable, payload: any) => {
     const { error } = await sb.from(table).insert([row]);
     if (error) throw error;
   } catch (e) {
+    if (isMutationAuthorizationError(e)) {
+      throw asMutationAuthorizationError(e);
+    }
     console.warn('Direct sync insert failed, queued for retry:', e);
     await localDb.enqueueSync(table, 'insert', payload);
   }
@@ -110,11 +117,17 @@ export const syncUpdate = async (table: SyncTable, id: string, updates: any) => 
     const userId = await getUserId();
     if (!userId) return;
     const row = toDbRow(table, updates, userId);
-    // Remove owner_id and id from the update payload (they're used in the filter)
+    // Remove owner_id and id from the update payload (they're used in the filter).
     const { owner_id: _o, id: _i, ...updateRow } = row as any;
-    const { error } = await sb.from(table).update(updateRow).eq('id', id).eq('owner_id', userId);
+    const query = table === 'settings'
+      ? sb.from(table).upsert(row)
+      : sb.from(table).update(updateRow).eq('id', id).eq('owner_id', userId);
+    const { error } = await query;
     if (error) throw error;
   } catch (e) {
+    if (isMutationAuthorizationError(e)) {
+      throw asMutationAuthorizationError(e);
+    }
     console.warn('Direct sync update failed, queued for retry:', e);
     await localDb.enqueueSync(table, 'update', { id, ...updates });
   }
@@ -137,6 +150,9 @@ export const syncDelete = async (table: SyncTable, id: string | string[]) => {
       if (error) throw error;
     }
   } catch (e) {
+    if (isMutationAuthorizationError(e)) {
+      throw asMutationAuthorizationError(e);
+    }
     console.warn('Direct sync delete failed, queued for retry:', e);
     await localDb.enqueueSync(table, 'delete', { id });
   }

@@ -13,7 +13,14 @@ vi.mock('./hooks/useAuth', () => ({
 
 vi.mock('./lib/localDb', () => {
   const store = new Map<string, unknown>();
+  let activeScope = 'local-user';
   return {
+    setActiveStorageScope: vi.fn((scope: string) => {
+      activeScope = scope;
+      return Promise.resolve();
+    }),
+    getActiveStorageScope: vi.fn(() => activeScope),
+    clearStorageScope: vi.fn(() => Promise.resolve()),
     localDb: {
       getEvents: vi.fn(() => Promise.resolve((store.get('events') as unknown[]) ?? [])),
       setEvents: vi.fn((list: unknown[]) => { store.set('events', list); return Promise.resolve(); }),
