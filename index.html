@@ -7,50 +7,20 @@
     <meta name="description" content="A friendly family calendar that runs locally or syncs with Supabase." />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23ff4d15'/%3E%3Crect x='10' y='16' width='44' height='40' rx='6' fill='%23FAF9F6' stroke='%231A1A1A' stroke-width='4'/%3E%3Crect x='10' y='16' width='44' height='12' fill='%231A1A1A'/%3E%3Ccircle cx='22' cy='12' r='3' fill='%231A1A1A'/%3E%3Ccircle cx='42' cy='12' r='3' fill='%231A1A1A'/%3E%3Crect x='20' y='34' width='8' height='8' fill='%23ff4d15'/%3E%3Crect x='32' y='34' width='8' height='8' fill='%2380CBC4'/%3E%3Crect x='20' y='44' width='8' height='8' fill='%23F48FB1'/%3E%3Crect x='32' y='44' width='8' height='8' fill='%23B39DDB'/%3E%3C/svg%3E" />
     <!--
-      Content Security Policy. `'unsafe-inline'` for scripts is required
-      by the dev-mode error overlay in index.html and Vite's HMR client.
-      For production hardening, switch to nonce-based or hash-based
-      scripts via a header injected by the hosting layer (e.g., a
-      Cloudflare Worker). `'unsafe-inline'` for styles is required by
-      Framer Motion + Tailwind's runtime style application. Scripts are
-      locked to 'self' with `'wasm-unsafe-eval'` allowed for date-fns
-      and chrono-node. Connect-src includes Supabase + Google Calendar
-      APIs (push sync) plus the Unsplash demo image CDN.
+      Content Security Policy. The inline debug overlay has been removed
+      so production no longer needs `'unsafe-inline'` for scripts here.
+      `'unsafe-inline'` for styles is still required by Framer Motion +
+      Tailwind's runtime style application. Scripts stay locked to
+      `'self'` with `'wasm-unsafe-eval'` allowed for date-fns and
+      chrono-node. Connect-src includes Supabase + Google Calendar APIs.
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://www.googleapis.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.googleapis.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" />
+    <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <meta name="color-scheme" content="light dark" />
   </head>
   <body>
-    <div id="error-boundaries" style="color:white;z-index:999999;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(200,0,0,0.9);padding:20px;display:none;overflow-y:auto;font-family:monospace;font-size:16px;"></div>
-    <script>
-      window.addEventListener('error', function(e) {
-        var el = document.getElementById('error-boundaries');
-        el.style.display = 'block';
-        el.innerHTML += '<b>Global Error:</b> ' + e.message + '<br><b>Filename:</b> ' + e.filename + ':' + e.lineno + '<br><b>Stack:</b><br>' + (e.error && e.error.stack ? e.error.stack : 'N/A') + '<hr>';
-      });
-      window.addEventListener('unhandledrejection', function(e) {
-        var el = document.getElementById('error-boundaries');
-        el.style.display = 'block';
-        el.innerHTML += '<b>Unhandled Promise Rejection:</b><br>' + (e.reason && e.reason.stack ? e.reason.stack : e.reason) + '<hr>';
-      });
-      
-      const originalConsoleError = console.error;
-      console.error = function(...args) {
-        var el = document.getElementById('error-boundaries');
-        el.style.display = 'block';
-        let str = '';
-        try { str = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '); } catch(err) { str = String(args); }
-        if (str.includes("Warning:") || str.includes("The above error occurred") || str.includes("React DevTools")) {
-           originalConsoleError.apply(console, args);
-           return;
-        }
-        el.innerHTML += '<b>Console Error:</b><br>' + str + '<hr>';
-        originalConsoleError.apply(console, args);
-      }
-    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

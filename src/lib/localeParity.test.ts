@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 const LOCALES_DIR = resolve(process.cwd(), 'src', 'locales');
 const REFERENCE = 'en.json';
 
-function collectKeys(obj, prefix = ''): string[] {
+function collectKeys(obj: unknown, prefix = ''): string[] {
   const keys: string[] = [];
   if (obj === null || typeof obj !== 'object') return keys;
   for (const [k, v] of Object.entries(obj)) {
