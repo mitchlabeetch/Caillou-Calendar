@@ -148,7 +148,7 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
                 initial={{ opacity: 0, height: 0 }} 
                 animate={{ opacity: 1, height: 'auto' }} 
                 exit={{ opacity: 0, height: 0 }}
-                className="font-bold text-lg text-[#5e5e5e] uppercase tracking-widest opacity-70 mb-2 whitespace-nowrap overflow-hidden"
+                className="font-bold text-lg text-muted uppercase tracking-widest opacity-70 mb-2 whitespace-nowrap overflow-hidden"
               >
                 {t('app.members')}
               </motion.h3>
@@ -386,20 +386,20 @@ export function Sidebar({ isOpenOnMobile, onCloseMobile, onSignOut }: { isOpenOn
               <div className="grid grid-cols-2 gap-2">
                 <SidebarTooltip text={t('app.appSettings')} disabled={true}>
                   <button onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
-                    <Settings className="w-4 h-4 shrink-0 text-[#5e5e5e] group-hover:text-[#5e5e5e] transition-colors group-hover:rotate-45" />
-                    <span className="text-xs font-bold truncate text-[#5E5E5E]">{t('app.settings')}</span>
+                    <Settings className="w-4 h-4 shrink-0 text-muted group-hover:text-muted transition-colors group-hover:rotate-45" />
+                    <span className="text-xs font-bold truncate text-muted">{t('app.settings')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.manageFamily')} disabled={true}>
                   <button onClick={() => setIsFamilyOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <Users className="w-4 h-4 shrink-0 text-ink/70 group-hover:text-ink transition-colors group-hover:scale-110" />
-                    <span className="text-xs font-bold truncate text-[#5e5e5e]">{t('app.family')}</span>
+                    <span className="text-xs font-bold truncate text-muted">{t('app.family')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.manageLocations')} disabled={true}>
                   <button onClick={() => setIsPlacesOpen(true)} className="flex items-center gap-2 px-3 py-2.5 bg-surface border-[2px] border-ink rounded-xl shadow-neo-sm hover:bg-primary/10 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all w-full group">
                     <MapPin className="w-4 h-4 shrink-0 text-ink/70 group-hover:text-ink transition-colors group-hover:-translate-y-0.5" />
-                    <span className="text-xs font-bold truncate border-[#5e5e5e] text-[#5e5e5e]">{t('app.places')}</span>
+                    <span className="text-xs font-bold truncate border-muted text-muted">{t('app.places')}</span>
                   </button>
                 </SidebarTooltip>
                 <SidebarTooltip text={t('app.logout')} disabled={true}>

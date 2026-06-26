@@ -8,11 +8,13 @@ import { useEvents } from '../lib/eventsContext';
 import { X, Repeat, BellRing, CheckSquare, GripVertical, Gift, Pin, CalendarDays } from 'lucide-react';
 import { EventHoverCard } from './EventHoverCard';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { getDateLocale } from '../lib/dateLocale';
 
 export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date, onDateClick?: (d: Date) => void }) {
-  const { t } = useTranslation();
-  const { events, setEvents, moveEvent, selectedMembers, familyMembers, settings, triggerDropAnimation } = useEvents();
+  const { t, i18n } = useTranslation();
+  const { events, addEvent, moveEvent, selectedMembers, familyMembers, settings, triggerDropAnimation } = useEvents();
   const isMobile = useIsMobile();
+  const dateOptions = { locale: getDateLocale(i18n.language) };
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -69,8 +71,12 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
     return eventsByDay.get(format(day, 'yyyy-MM-dd')) ?? [];
   };
 
+  const activateDay = (day: Date) => {
+    onDateClick?.(day);
+  };
+
   return (
-    <main className="flex-1 flex flex-col relative bg-bg-app p-2 h-full min-h-0 overflow-hidden">
+    <section className="flex-1 flex flex-col relative bg-bg-app p-2 h-full min-h-0 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden">
         <div className="grid grid-cols-7 mb-1 sm:mb-2 shrink-0 min-w-[500px] md:min-w-[700px]">
           {(t('app.daysShort', { returnObjects: true }) as string[]).map((d) => (
@@ -129,6 +135,15 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
                 boxShadow: dragOverDay === day.toString() ? "0px 10px 20px rgba(0,0,0,0.2)" : "4px 4px 0px rgba(26,26,26,0.05)"
               }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              role="button"
+              tabIndex={0}
+              aria-label={format(day, 'PPPP', dateOptions)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  activateDay(day);
+                }
+              }}
               className={cn(
                 "calendar-grid-cell pt-3 pr-4 pb-2 pl-2 sm:pt-4 sm:pr-5 sm:pb-3 sm:pl-3 flex flex-col gap-1 sm:gap-2 cursor-pointer transition-colors min-h-[100px] sm:min-h-[150px] md:min-h-[200px] border-2",
                 dragOverDay === day.toString() ? "bg-primary/20 border-primary ring-2 ring-primary ring-inset z-20" : 
@@ -175,7 +190,7 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
                       className="w-full bg-transparent outline-none font-black text-xs sm:text-sm text-ink placeholder:text-ink/40 focus:ring-2 focus:ring-primary focus:border-primary border-transparent rounded px-1 transition-all"
                       value={quickAddTitle}
                       onChange={e => setQuickAddTitle(e.target.value)}
-                      onKeyDown={e => {
+                      onKeyDown={async e => {
                         if (e.key === 'Enter' && quickAddTitle.trim()) {
                            const newEvent: CalendarEvent = {
                              id: Math.random().toString(36).substring(7),
@@ -185,7 +200,8 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
                              recurrence: { type: 'none' },
                              reminders: []
                            };
-                           setEvents(prev => [...prev, newEvent]);
+                           const didCreateEvent = await addEvent(newEvent);
+                           if (!didCreateEvent) return;
                            setQuickAddDay(null);
                            setQuickAddTitle('');
                         } else if (e.key === 'Escape') {
@@ -205,13 +221,18 @@ export function CalendarMonth({ currentDate, onDateClick }: { currentDate: Date,
         })}
       </div>
       </div>
-    </main>
+    </section>
   );
 }
 
 function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?: string, isMobile: boolean }) {
   const { deleteEvent, swapEvents, setSelectedEventId, isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, familyMembers, droppedEventId, userRole } = useEvents();
   const members = event.memberIds.map(id => familyMembers.find(m => m.id === id)).filter(Boolean) as FamilyMember[];
+  const eventLabel = [
+    event.title,
+    event.allDay ? 'All day' : event.startTime,
+    members.length > 0 ? members.map(member => member.name).join(', ') : null,
+  ].filter(Boolean).join(', ');
 
   const isSelected = selectedEventIdsForDelete.includes(event.id);
 
@@ -268,6 +289,20 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
             setSelectedEventId(event.id); 
           }
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            if (isMultiSelectMode) {
+              toggleEventSelectionForDelete(event.id);
+            } else {
+              setSelectedEventId(event.id);
+            }
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={eventLabel}
         className={cn(`h-[70px] sm:h-[100px] w-full border-[2px] sm:border-[3px] p-1 sm:p-1.5 flex flex-col gap-1 shadow-neo-sm sm:shadow-neo transition-all cursor-pointer relative group pill-hover-effect mt-1`, 
           spanClass,
           members[0]?.bgClass || "bg-mem-3",
@@ -278,6 +313,8 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
         {!isMultiSelectMode && userRole !== 'child' && (
           <button 
             onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }}
+            type="button"
+            aria-label={`Delete ${event.title}`}
             className="absolute -top-2 -right-2 w-6 h-6 bg-red-400 text-white rounded-full border-[2px] border-ink opacity-0 group-hover:opacity-100 flex items-center justify-center z-20 hover:scale-110 transition-all shadow-neo"
           >
             <X className="w-4 h-4" />
@@ -332,14 +369,14 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
       className={cn(
         "h-[36px] w-full border-[3px] px-4 flex justify-between items-center shadow-neo-md transition-all cursor-pointer relative group pill-hover-effect overflow-visible z-10",
         spanClassNonThumb,
-        members.length === 1 ? members[0].bgClass : "bg-bg-light",
+        members.length === 1 ? members[0].bgClass : members.length > 1 ? "pill-multi-member" : "bg-bg-light",
         isSelected ? "border-primary opacity-90 scale-95" : "border-ink",
         event.recurrence && event.recurrence.type !== 'none' ? "border-dashed" : "border-solid",
         event.allDay && "ring-2 ring-ink/30",
         event.pinned && "ring-2 ring-primary",
         event.category && `cat-${event.category}`
       )}
-      style={event.colorOverride ? { background: event.colorOverride, color: 'white' } : members.length > 1 ? { background: 'repeating-linear-gradient(45deg, #B39DDB, #B39DDB 10px, #80CBC4 10px, #80CBC4 20px, #FFAB91 20px, #FFAB91 30px, #F48FB1 30px, #F48FB1 40px)' } : {}}
+      style={event.colorOverride ? { background: event.colorOverride, color: 'white' } : {}}
       onClick={(e) => {
         e.stopPropagation();
         if (isMultiSelectMode) {
@@ -348,6 +385,20 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
           setSelectedEventId(event.id);
         }
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isMultiSelectMode) {
+            toggleEventSelectionForDelete(event.id);
+          } else {
+            setSelectedEventId(event.id);
+          }
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={eventLabel}
     >
       <div className="flex items-center gap-2 overflow-hidden w-full">
         {!isMultiSelectMode && <GripVertical className="w-3.5 h-3.5 opacity-40 shrink-0 cursor-grab active:cursor-grabbing" />}
@@ -377,6 +428,8 @@ function EventPill({ event, dayStr, isMobile }: { event: CalendarEvent, dayStr?:
       {!isMultiSelectMode && userRole !== 'child' && (
         <button 
           onClick={(e) => { e.stopPropagation(); deleteEvent(event.id); }}
+          type="button"
+          aria-label={`Delete ${event.title}`}
           className="absolute -top-1 -right-1 w-6 h-6 bg-red-400 text-white rounded-full border-[2px] border-ink opacity-0 group-hover:opacity-100 flex items-center justify-center z-20 hover:scale-110 transition-all shadow-neo"
         >
           <X className="w-4 h-4" />

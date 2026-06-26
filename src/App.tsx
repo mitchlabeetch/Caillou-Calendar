@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, type MouseEvent as ReactMouseEvent } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CalendarMonth } from './components/CalendarMonth';
 import { CalendarWeek } from './components/CalendarWeek';
@@ -26,9 +26,9 @@ import { useTranslation } from 'react-i18next';
 import { getDateLocale } from './lib/dateLocale';
 import { CalendarEvent, FamilyMember, AppSettings } from './types';
 import { EventsContext } from './lib/eventsContext';
-import { dbRowToEvent, dbRowToMember, dbRowToSettings } from './lib/supabase';
-import { localDb, flushOutboundSyncQueue } from './lib/localDb';
-import { syncInsert, syncUpdate, syncDelete } from './lib/syncEngine';
+import { clearStorageScope, flushOutboundSyncQueue, getActiveStorageScope, localDb, setActiveStorageScope } from './lib/localDb';
+import { syncInsert, syncUpdate, syncDelete } from './lib/syncActions';
+import { isMutationAuthorizationError } from './lib/mutationAuthorization';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useAuth } from './hooks/useAuth';
 import { useToasts } from './hooks/useToasts';
@@ -47,6 +47,27 @@ interface AppProps {
 }
 
 void ({} as AppProps);
+
+const DEFAULT_SETTINGS: AppSettings = {
+  startOfWeek: 1,
+  timeFormat: '24h',
+};
+
+const SIGNED_OUT_STORAGE_SCOPE = 'signed-out';
+
+function getStorageScope(user: { uid: string; email: string } | null): string {
+  if (!user) return SIGNED_OUT_STORAGE_SCOPE;
+  return user.uid === 'local-user' ? 'local-user' : `user:${user.uid}`;
+}
+
+function getDefaultPlaces(translate: (key: string) => string) {
+  return [
+    { id: '1', name: translate('app.home'), icon: 'Home' },
+    { id: '2', name: translate('app.school'), icon: 'BookOpen' },
+    { id: '3', name: translate('app.work'), icon: 'Briefcase' },
+    { id: '4', name: translate('app.gym'), icon: 'Dumbbell' },
+  ];
+}
 
 function InteractiveLogo({ onClick, familyMembers = [] }: { onClick?: () => void, familyMembers?: any[] }) {
   const lastTrigger = useRef(0);
@@ -173,7 +194,11 @@ export default function App(_props: AppProps) {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const { user, loading: authLoading, signOut: handleSignOut } = useAuth();
+  const storageScope = getStorageScope(user);
   const [userRole] = useUserRole();
+  const { toasts, showToast: showToastFromHook, dismissToast } = useToasts();
+  const { selectedMembers, setSelectedMembers, toggleMember } = usePersistedSelectedMembers();
+  const [storageReady, setStorageReady] = useState(false);
 
   // Email/password auth form state
   const [authEmail, setAuthEmail] = useState('');
@@ -182,44 +207,221 @@ export default function App(_props: AppProps) {
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const isMobile = useIsMobile();
+  const mainContentRef = useRef<HTMLElement | null>(null);
+  const previousStorageScopeRef = useRef<string | null>(null);
+  const isRemoteUser = !!user && user.uid !== 'local-user';
 
-  useEffect(() => {
-    (async () => {
-      const dbEvents = await localDb.getEvents();
-      if (dbEvents.length > 0) {
-        setEvents(dbEvents);
-        return;
-      }
-      // One-shot migration: pull events out of the legacy localStorage
-      // shim, then delete the key so we don't keep two sources of truth
-      // around. See wiki/operations/18-production-audit.md §12 (🔴 #7).
-      const saved = localStorage.getItem('synoptic-events');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setEvents(parsed);
-          await localDb.setEvents(parsed);
-          localStorage.removeItem('synoptic-events');
-        } catch (e) {
-          console.error('Failed to migrate events from localStorage', e);
-        }
-      }
-    })();
+  const replaceEvents = useCallback((nextEvents: CalendarEvent[]) => {
+    setEvents(nextEvents);
   }, []);
 
+  const addEvent = useCallback(async (event: CalendarEvent) => {
+    if (!isRemoteUser) {
+      setEvents(prev => [...prev, event]);
+      return true;
+    }
+
+    try {
+      await syncInsert('events', event);
+      setEvents(prev => [...prev, event]);
+      return true;
+    } catch (error) {
+      console.warn('Event create rejected', error);
+      showToastFromHook(
+        isMutationAuthorizationError(error)
+          ? t('app.permissionDenied', 'You are not allowed to perform this action.')
+          : t('app.syncFailed', 'Sync failed — change reverted')
+      );
+      return false;
+    }
+  }, [isRemoteUser, showToastFromHook, t]);
+
+  const addEvents = useCallback(async (nextEvents: CalendarEvent[]) => {
+    if (nextEvents.length === 0) return true;
+    if (!isRemoteUser) {
+      setEvents(prev => [...prev, ...nextEvents]);
+      return true;
+    }
+
+    const acceptedEvents: CalendarEvent[] = [];
+
+    for (const event of nextEvents) {
+      try {
+        await syncInsert('events', event);
+        acceptedEvents.push(event);
+      } catch (error) {
+        console.warn('Event import rejected', error);
+        showToastFromHook(
+          isMutationAuthorizationError(error)
+            ? t('app.permissionDenied', 'You are not allowed to perform this action.')
+            : t('app.syncFailed', 'Sync failed — change reverted')
+        );
+        if (acceptedEvents.length > 0) {
+          setEvents(prev => [...prev, ...acceptedEvents]);
+        }
+        return false;
+      }
+    }
+
+    setEvents(prev => [...prev, ...acceptedEvents]);
+    return true;
+  }, [isRemoteUser, showToastFromHook, t]);
+
+  const updateEvent = useCallback(async (id: string, updates: Partial<CalendarEvent>) => {
+    if (!isRemoteUser) {
+      setEvents(prev => prev.map(event => event.id === id ? { ...event, ...updates } : event));
+      return true;
+    }
+
+    try {
+      await syncUpdate('events', id, updates);
+      setEvents(prev => prev.map(event => event.id === id ? { ...event, ...updates } : event));
+      return true;
+    } catch (error) {
+      console.warn('Event update rejected', error);
+      showToastFromHook(
+        isMutationAuthorizationError(error)
+          ? t('app.permissionDenied', 'You are not allowed to perform this action.')
+          : t('app.syncFailed', 'Sync failed — change reverted')
+      );
+      return false;
+    }
+  }, [isRemoteUser, showToastFromHook, t]);
+
   useEffect(() => {
+    let cancelled = false;
+    const previousScope = previousStorageScopeRef.current;
+    const shouldResetPersistedMemberFilter =
+      previousScope !== null && previousScope !== storageScope;
+
+    setStorageReady(false);
+    replaceEvents([]);
+    setFamilyMembersState([]);
+    setPlacesState([]);
+    setSettingsState(DEFAULT_SETTINGS);
+    setSelectedDay(null);
+    setSelectedEventId(null);
+    setEventsToDelete(null);
+    setIsMultiSelectMode(false);
+    setSelectedEventIdsForDelete([]);
+    setSelectedMembers([]);
+
+    if (shouldResetPersistedMemberFilter) {
+      try {
+        localStorage.removeItem('synoptic-selected-members-persist');
+        localStorage.removeItem('synoptic-selected-members-init');
+      } catch {}
+    }
+
+    const hydrateScope = async () => {
+      const allowLegacyLocalMigration = !user || user.uid === 'local-user';
+
+      const readLegacyJson = async <T,>(key: string, persist: (value: T) => Promise<void>, errorMessage: string) => {
+        if (!allowLegacyLocalMigration) return null;
+        const saved = localStorage.getItem(key);
+        if (!saved) return null;
+
+        try {
+          const parsed = JSON.parse(saved) as T;
+          await persist(parsed);
+          localStorage.removeItem(key);
+          return parsed;
+        } catch (error) {
+          console.error(errorMessage, error);
+          return null;
+        }
+      };
+
+      await setActiveStorageScope(storageScope);
+      if (cancelled) return;
+
+      if (storageScope === SIGNED_OUT_STORAGE_SCOPE) {
+        await clearStorageScope(storageScope);
+      }
+      if (cancelled) return;
+
+      let nextEvents = await localDb.getEvents();
+      if (nextEvents.length === 0) {
+        const migratedEvents = await readLegacyJson<CalendarEvent[]>(
+          'synoptic-events',
+          (value) => localDb.setEvents(value),
+          'Failed to migrate events from localStorage',
+        );
+        if (migratedEvents) {
+          nextEvents = migratedEvents;
+        }
+      }
+
+      let nextFamilyMembers = await localDb.getFamilyMembers();
+      if (nextFamilyMembers.length === 0) {
+        const migratedFamily = await readLegacyJson<FamilyMember[]>(
+          'synoptic-family',
+          (value) => localDb.setFamilyMembers(value),
+          'Failed to migrate family members from localStorage',
+        );
+        if (migratedFamily) {
+          nextFamilyMembers = migratedFamily;
+        }
+      }
+
+      let nextPlaces = await localDb.getPlaces();
+      if (nextPlaces.length === 0) {
+        const migratedPlaces = await readLegacyJson<{ id: string; name: string; icon?: string }[]>(
+          'synoptic-places',
+          (value) => localDb.setPlaces(value),
+          'Failed to migrate places from localStorage',
+        );
+        if (migratedPlaces) {
+          nextPlaces = migratedPlaces;
+        } else {
+          nextPlaces = getDefaultPlaces((key) => t(key));
+        }
+      }
+
+      let nextSettings = await localDb.getSettings();
+      if (!nextSettings) {
+        const migratedSettings = await readLegacyJson<AppSettings>(
+          'synoptic-settings',
+          (value) => localDb.setSettings(value),
+          'Failed to migrate settings from localStorage',
+        );
+        nextSettings = migratedSettings ?? DEFAULT_SETTINGS;
+      }
+
+      if (cancelled || getActiveStorageScope() !== storageScope) return;
+
+      replaceEvents(nextEvents);
+      setFamilyMembersState(nextFamilyMembers);
+      setPlacesState(nextPlaces);
+      setSettingsState(nextSettings);
+      setStorageReady(true);
+      previousStorageScopeRef.current = storageScope;
+    };
+
+    void hydrateScope();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [replaceEvents, setSelectedMembers, storageScope, t, user]);
+
+  useEffect(() => {
+    if (!storageReady) return;
     // Events now live exclusively in IndexedDB. UI preferences
     // (theme, currentDate, etc.) continue to use localStorage because
     // they are tiny scalars and don't need a query layer.
     void localDb.setEvents(events);
-  }, [events]);
+  }, [events, storageReady]);
 
   useEffect(() => {
     if (!user || user.uid === 'local-user') return;
+    let isActive = true;
+    let removeActiveChannel: (() => void) | null = null;
 
-    import('./lib/supabase').then(s => {
+    const initializeRealtime = async () => {
+      const s = await import('./lib/supabase');
       const sb = s.getSupabase();
-      if (!sb) return;
+      if (!sb || !isActive) return;
 
       const fetchEvents = async () => {
         try {
@@ -227,29 +429,43 @@ export default function App(_props: AppProps) {
             .from('events')
             .select('*')
             .eq('owner_id', user.uid);
-          
-          if (!error && data) {
-            setEvents(data.map(dbRowToEvent));
-          }
+
+          if (!isActive || getActiveStorageScope() !== storageScope || error || !data) return;
+          replaceEvents(data.map(s.dbRowToEvent));
         } catch (e) {
-          console.warn('Failed to fetch events from Supabase', e);
+          if (isActive) {
+            console.warn('Failed to fetch events from Supabase', e);
+          }
         }
       };
-      
-      fetchEvents();
+
+      await fetchEvents();
+      if (!isActive) return;
 
       const subscription = sb
-        .channel('events_changes')
+        .channel(`events_changes:${user.uid}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `owner_id=eq.${user.uid}` }, () => {
-          fetchEvents();
+          void fetchEvents();
         })
         .subscribe();
 
-      return () => {
-        sb.removeChannel(subscription);
+      removeActiveChannel = () => {
+        void sb.removeChannel(subscription);
+        removeActiveChannel = null;
       };
-    });
-  }, [user]);
+
+      if (!isActive) {
+        removeActiveChannel();
+      }
+    };
+
+    void initializeRealtime();
+
+    return () => {
+      isActive = false;
+      removeActiveChannel?.();
+    };
+  }, [replaceEvents, storageScope, user]);
 
   // Network state watcher: flush outbound sync queue when coming back online
   useEffect(() => {
@@ -260,8 +476,11 @@ export default function App(_props: AppProps) {
     return () => window.removeEventListener('online', handleOnline);
   }, []);
 
-  const { toasts, showToast: showToastFromHook, dismissToast } = useToasts();
-  const { selectedMembers, setSelectedMembers, toggleMember } = usePersistedSelectedMembers();
+  useEffect(() => {
+    if (!storageReady || !user || user.uid === 'local-user' || !navigator.onLine) return;
+    void flushOutboundSyncQueue();
+  }, [storageReady, storageScope, user]);
+
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedEventIdsForDelete, setSelectedEventIdsForDelete] = useState<string[]>([]);
 
@@ -286,75 +505,13 @@ export default function App(_props: AppProps) {
 
   const [familyMembersState, setFamilyMembersState] = useState<FamilyMember[]>([]);
   const [placesState, setPlacesState] = useState<{id: string, name: string, icon?: string}[]>([]);
-  const [settingsState, setSettingsState] = useState<AppSettings>({
-    startOfWeek: 1,
-    timeFormat: '24h'
-  });
-
-  // Load from IndexedDB (with localStorage migration fallback for users
-  // who were on the pre-IndexedDB shim). The localStorage keys are
-  // removed after migration to keep a single source of truth.
-  useEffect(() => {
-    (async () => {
-      const dbFamily = await localDb.getFamilyMembers();
-      if (dbFamily.length > 0) {
-        setFamilyMembersState(dbFamily);
-      } else {
-        const saved = localStorage.getItem('synoptic-family');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setFamilyMembersState(parsed);
-            await localDb.setFamilyMembers(parsed);
-            localStorage.removeItem('synoptic-family');
-          } catch {}
-        }
-      }
-
-      const dbPlaces = await localDb.getPlaces();
-      if (dbPlaces.length > 0) {
-        setPlacesState(dbPlaces);
-      } else if (localStorage.getItem('synoptic-places')) {
-        const saved = localStorage.getItem('synoptic-places');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setPlacesState(parsed);
-            await localDb.setPlaces(parsed);
-            localStorage.removeItem('synoptic-places');
-          } catch {}
-        }
-      } else {
-        setPlacesState([
-          { id: '1', name: t('app.home'), icon: 'Home' },
-          { id: '2', name: t('app.school'), icon: 'BookOpen' },
-          { id: '3', name: t('app.work'), icon: 'Briefcase' },
-          { id: '4', name: t('app.gym'), icon: 'Dumbbell' }
-        ]);
-      }
-
-      const dbSettings = await localDb.getSettings();
-      if (dbSettings) {
-        setSettingsState(dbSettings);
-      } else {
-        const saved = localStorage.getItem('synoptic-settings');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setSettingsState(parsed);
-            await localDb.setSettings(parsed);
-            localStorage.removeItem('synoptic-settings');
-          } catch {}
-        }
-      }
-    })();
-  }, [t]);
+  const [settingsState, setSettingsState] = useState<AppSettings>(DEFAULT_SETTINGS);
 
   // First-run seed: when the family loads and no persisted filter
   // exists yet, default to all members visible. The `usePersistedSelectedMembers`
   // hook handles subsequent reads/writes.
   useEffect(() => {
-    if (familyMembersState.length === 0) return;
+    if (!storageReady || familyMembersState.length === 0) return;
     try {
       const hasPersist = localStorage.getItem('synoptic-selected-members-persist');
       const hasLegacy = localStorage.getItem('synoptic-selected-members-init');
@@ -363,87 +520,165 @@ export default function App(_props: AppProps) {
         localStorage.setItem('synoptic-selected-members-init', 'true');
       }
     } catch {}
-  }, [familyMembersState]);
+  }, [familyMembersState, setSelectedMembers, storageReady]);
 
   // Family, places, and settings all live exclusively in IndexedDB
   // now. UI preferences (selectedMembers, theme, currentDate, …)
   // continue to use localStorage because they are cheap scalars.
-  useEffect(() => { void localDb.setFamilyMembers(familyMembersState); }, [familyMembersState]);
-  useEffect(() => { void localDb.setPlaces(placesState); }, [placesState]);
-  useEffect(() => { void localDb.setSettings(settingsState); }, [settingsState]);
+  useEffect(() => {
+    if (!storageReady) return;
+    void localDb.setFamilyMembers(familyMembersState);
+  }, [familyMembersState, storageReady]);
+  useEffect(() => {
+    if (!storageReady) return;
+    void localDb.setPlaces(placesState);
+  }, [placesState, storageReady]);
+  useEffect(() => {
+    if (!storageReady) return;
+    void localDb.setSettings(settingsState);
+  }, [settingsState, storageReady]);
 
   useEffect(() => {
     if (!user || user.uid === 'local-user') return;
-    import('./lib/supabase').then(s => {
+    let cancelled = false;
+
+    void import('./lib/supabase').then(async (s) => {
       const sb = s.getSupabase();
-      if (!sb) return;
+      if (!sb || cancelled) return;
 
       const fetchFamily = async () => {
         const { data } = await sb.from('family_members').select('*').eq('owner_id', user.uid);
-        if (data && data.length > 0) setFamilyMembersState(data.map(dbRowToMember));
+        if (cancelled || getActiveStorageScope() !== storageScope || !data || data.length === 0) return;
+        setFamilyMembersState(data.map(s.dbRowToMember));
       };
       const fetchPlaces = async () => {
         const { data } = await sb.from('places').select('*').eq('owner_id', user.uid);
-        if (data && data.length > 0) setPlacesState(data);
+        if (cancelled || getActiveStorageScope() !== storageScope || !data || data.length === 0) return;
+        setPlacesState(data);
       };
       const fetchSettings = async () => {
         const { data } = await sb.from('settings').select('*').eq('owner_id', user.uid).single();
-        if (data) {
-          setSettingsState(prev => ({ ...prev, ...dbRowToSettings(data) }));
-        }
+        if (cancelled || getActiveStorageScope() !== storageScope || !data) return;
+        setSettingsState(prev => ({ ...prev, ...s.dbRowToSettings(data) }));
       };
 
-      fetchFamily();
-      fetchPlaces();
-      fetchSettings();
+      await Promise.all([fetchFamily(), fetchPlaces(), fetchSettings()]);
     });
-  }, [user]);
 
-  const updateSettings = (updates: Partial<AppSettings>) => {
-    setSettingsState(prev => {
-      const next = { ...prev, ...updates };
-      if (user && user.uid !== 'local-user') {
-        syncUpdate('settings', 'app-settings', next);
-      }
-      return next;
-    });
+    return () => {
+      cancelled = true;
+    };
+  }, [storageScope, user]);
+
+  const getMutationFailureMessage = useCallback((error: unknown) => (
+    isMutationAuthorizationError(error)
+      ? t('app.permissionDenied', 'You are not allowed to perform this action.')
+      : t('app.syncFailed', 'Sync failed — change reverted')
+  ), [t]);
+
+  const reportProtectedMutationFailure = useCallback((error: unknown) => {
+    showToastFromHook(getMutationFailureMessage(error));
+  }, [getMutationFailureMessage, showToastFromHook]);
+
+  const updateSettings = async (updates: Partial<AppSettings>) => {
+    const next = { ...settingsState, ...updates };
+    if (!user || user.uid === 'local-user') {
+      setSettingsState(next);
+      return;
+    }
+
+    try {
+      await syncUpdate('settings', 'app-settings', next);
+      setSettingsState(next);
+    } catch (error) {
+      console.warn('Settings update rejected', error);
+      reportProtectedMutationFailure(error);
+    }
   };
 
-  const addFamilyMember = (m: FamilyMember) => {
-    setFamilyMembersState(prev => [...prev, m]);
-    if (user && user.uid !== 'local-user') {
-      syncInsert('family_members', m);
+  const addFamilyMember = async (m: FamilyMember) => {
+    if (!user || user.uid === 'local-user') {
+      setFamilyMembersState(prev => [...prev, m]);
+      return;
+    }
+
+    try {
+      await syncInsert('family_members', m);
+      setFamilyMembersState(prev => [...prev, m]);
+    } catch (error) {
+      console.warn('Family member insert rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
-  const updateFamilyMember = (id: string, updates: Partial<FamilyMember>) => {
-    setFamilyMembersState(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
-    if (user && user.uid !== 'local-user') {
-      syncUpdate('family_members', id, updates);
+  const updateFamilyMember = async (id: string, updates: Partial<FamilyMember>) => {
+    if (!user || user.uid === 'local-user') {
+      setFamilyMembersState(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+      return;
+    }
+
+    try {
+      await syncUpdate('family_members', id, updates);
+      setFamilyMembersState(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    } catch (error) {
+      console.warn('Family member update rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
-  const deleteFamilyMember = (id: string) => {
-    setFamilyMembersState(prev => prev.filter(m => m.id !== id));
-    if (user && user.uid !== 'local-user') {
-      syncDelete('family_members', id);
+  const deleteFamilyMember = async (id: string) => {
+    if (!user || user.uid === 'local-user') {
+      setFamilyMembersState(prev => prev.filter(m => m.id !== id));
+      return;
+    }
+
+    try {
+      await syncDelete('family_members', id);
+      setFamilyMembersState(prev => prev.filter(m => m.id !== id));
+    } catch (error) {
+      console.warn('Family member delete rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
 
-  const addPlace = (p: {id: string, name: string, icon?: string}) => {
-    setPlacesState(prev => [...prev, p]);
-    if (user && user.uid !== 'local-user') {
-      syncInsert('places', p);
+  const addPlace = async (p: {id: string, name: string, icon?: string}) => {
+    if (!user || user.uid === 'local-user') {
+      setPlacesState(prev => [...prev, p]);
+      return;
+    }
+
+    try {
+      await syncInsert('places', p);
+      setPlacesState(prev => [...prev, p]);
+    } catch (error) {
+      console.warn('Place insert rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
-  const updatePlace = (id: string, updates: Partial<{id: string, name: string, icon?: string}>) => {
-    setPlacesState(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
-    if (user && user.uid !== 'local-user') {
-      syncUpdate('places', id, updates);
+  const updatePlace = async (id: string, updates: Partial<{id: string, name: string, icon?: string}>) => {
+    if (!user || user.uid === 'local-user') {
+      setPlacesState(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+      return;
+    }
+
+    try {
+      await syncUpdate('places', id, updates);
+      setPlacesState(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    } catch (error) {
+      console.warn('Place update rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
-  const deletePlace = (id: string) => {
-    setPlacesState(prev => prev.filter(p => p.id !== id));
-    if (user && user.uid !== 'local-user') {
-      syncDelete('places', id);
+  const deletePlace = async (id: string) => {
+    if (!user || user.uid === 'local-user') {
+      setPlacesState(prev => prev.filter(p => p.id !== id));
+      return;
+    }
+
+    try {
+      await syncDelete('places', id);
+      setPlacesState(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.warn('Place delete rejected', error);
+      reportProtectedMutationFailure(error);
     }
   };
 
@@ -463,7 +698,7 @@ export default function App(_props: AppProps) {
         { strategy: 'last-write-wins' },
         { defaultMemberIds: () => familyMembersState.map(m => m.id) },
       );
-      setEvents(merged.events);
+      replaceEvents(merged.events);
       showToast(t('app.syncSuccess', { pushed: merged.result.pushed, pulled: merged.result.pulled }));
       setIsSyncModalOpen(false);
     } catch (err: any) {
@@ -512,7 +747,7 @@ export default function App(_props: AppProps) {
         }
         return [...removed.filter(r => !next.some(e => e.id === r.id)), ...next];
       });
-      showToast(t('app.syncFailed', 'Sync failed — change reverted'));
+      showToast(getMutationFailureMessage(err));
     }
   };
 
@@ -535,7 +770,7 @@ export default function App(_props: AppProps) {
     void syncUpdate('events', id, updates).catch((err) => {
       console.warn('Move sync failed; rolling back', err);
       setEvents(prev => prev.map(e => e.id === id ? previous : e));
-      showToast(t('app.syncFailed', 'Sync failed — change reverted'));
+      showToast(getMutationFailureMessage(err));
     });
   };
 
@@ -565,7 +800,7 @@ export default function App(_props: AppProps) {
           if (e.id === idB) return eventB;
           return e;
         }));
-        showToast(t('app.syncFailed', 'Sync failed — change reverted'));
+        showToast(getMutationFailureMessage(err));
       });
   };
 
@@ -583,6 +818,11 @@ export default function App(_props: AppProps) {
     setDirection(1);
     setCurrentDate(view === 'month' ? addMonths(currentDate, 1) : addWeeks(currentDate, 1));
   };
+
+  const handleSkipToMain = useCallback((event: ReactMouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    mainContentRef.current?.focus();
+  }, []);
 
   // Centralised keyboard shortcuts (←/→, Shift+←/→, M, W, T, 1–9).
   useKeyboardShortcuts({
@@ -619,7 +859,7 @@ export default function App(_props: AppProps) {
 
   return (
     <EventsContext.Provider value={{
-      events, setEvents, deleteEvent, moveEvent, swapEvents, showToast, selectedMembers, toggleMember, setSelectedEventId,
+      events, addEvent, addEvents, updateEvent, deleteEvent, moveEvent, swapEvents, showToast, selectedMembers, toggleMember, setSelectedEventId,
       isMultiSelectMode, selectedEventIdsForDelete, toggleEventSelectionForDelete, droppedEventId, triggerDropAnimation,
       familyMembers: familyMembersState, addFamilyMember, updateFamilyMember, deleteFamilyMember, reorderFamilyMembers: setFamilyMembersState,
       places: placesState, addPlace, updatePlace, deletePlace,
@@ -628,13 +868,18 @@ export default function App(_props: AppProps) {
       user
     }}>
       <div className="font-body bg-bg-app min-h-screen text-ink flex flex-col overflow-x-hidden">
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:bg-primary focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold">
+        <a
+          href="#main-content"
+          onClick={handleSkipToMain}
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:bg-primary focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:font-bold"
+        >
           Skip to main content
         </a>
         <header className="h-[60px] md:h-[90px] bg-surface border-b-[4px] border-ink flex items-center justify-between px-1.5 md:px-8 z-10 shrink-0 gap-2">
           <div className="flex items-center gap-1.5 md:gap-6 flex-1 min-w-0">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
+              aria-label={t('app.openSidebar', 'Open sidebar')}
               className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full border-[2px] border-ink bg-surface shadow-neo-sm shrink-0"
             >
               <Menu className="w-4 h-4 font-bold text-ink" strokeWidth={3} />
@@ -707,6 +952,7 @@ export default function App(_props: AppProps) {
             {/* Mobile View Switcher */}
             <button
               onClick={() => { setDirection(0); setView(view === 'month' ? 'week' : 'month'); }}
+              aria-label={view === 'month' ? t('app.week') : t('app.month')}
               className="sm:hidden flex items-center justify-center px-2.5 h-8 rounded-full border-[2px] border-ink bg-surface shadow-neo-sm font-bold text-xs uppercase"
             >
               {view === 'month' ? t('app.m') : t('app.w')}
@@ -782,7 +1028,12 @@ export default function App(_props: AppProps) {
         <div className="flex flex-1 overflow-hidden relative">
           <Sidebar isOpenOnMobile={isMobileSidebarOpen} onCloseMobile={() => setIsMobileSidebarOpen(false)} onSignOut={handleSignOut} />
           
-          <main className="flex-1 flex flex-col relative bg-bg-app p-2 overflow-hidden">
+          <main
+            id="main-content"
+            ref={mainContentRef}
+            tabIndex={-1}
+            className="flex-1 flex flex-col relative bg-bg-app p-2 overflow-hidden outline-none"
+          >
              {authLoading ? (
                <div className="flex-1 flex items-center justify-center">
                  <div className="animate-spin w-12 h-12 border-[4px] border-ink border-t-transparent rounded-full" />
@@ -990,7 +1241,7 @@ export default function App(_props: AppProps) {
           maxWidth="max-w-sm"
           className="text-center"
         >
-          <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
+          <div className="w-16 h-16 bg-avatar rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
             <AlertCircle className="w-8 h-8 text-ink" />
           </div>
           <h2 className="text-2xl font-display font-bold mb-2">
@@ -1026,7 +1277,7 @@ export default function App(_props: AppProps) {
           maxWidth="max-w-sm"
           className="text-center"
         >
-          <div className="w-16 h-16 bg-[#F4A7BB] rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
+          <div className="w-16 h-16 bg-avatar rounded-full border-[3px] border-ink flex items-center justify-center mx-auto mb-4 shadow-neo">
             <RefreshCw className={cn('w-8 h-8 text-ink', isSyncing && 'animate-spin')} />
           </div>
           <h2 className="text-2xl font-display font-bold mb-2">{t('app.syncConfirmTitle')}</h2>

@@ -61,7 +61,7 @@ export function DayEventsModal({ isOpen, date, onClose }: { isOpen: boolean, dat
               <motion.div
                 animate={{ x: [0, 10, 0], y: [0, 5, 0] }}
                 transition={{ repeat: Infinity, duration: 5, ease: "easeInOut", delay: 0.5 }}
-                className="absolute inset-4 bg-[#EF476F]/20 rounded-full z-10"
+                className="absolute inset-4 bg-birthday/20 rounded-full z-10"
               />
               <motion.div
                 initial={{ scale: 0 }}
@@ -69,7 +69,7 @@ export function DayEventsModal({ isOpen, date, onClose }: { isOpen: boolean, dat
                 transition={{ type: 'spring', bounce: 0.6, duration: 1 }}
                 className="w-24 h-24 bg-surface rounded-3xl border-[4px] border-ink shadow-neo z-20 flex items-center justify-center rotate-3"
               >
-                <CalendarHeart className="w-12 h-12 text-[#EF476F]" />
+                <CalendarHeart className="w-12 h-12 text-birthday" />
               </motion.div>
               <motion.div
                 animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
@@ -81,7 +81,7 @@ export function DayEventsModal({ isOpen, date, onClose }: { isOpen: boolean, dat
               <motion.div
                 animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.8, 0.3] }}
                 transition={{ repeat: Infinity, duration: 3, ease: "easeInOut", delay: 1 }}
-                className="absolute bottom-2 -left-2 text-[#EF476F] z-30"
+                className="absolute bottom-2 -left-2 text-birthday z-30"
               >
                 âœ¨
               </motion.div>

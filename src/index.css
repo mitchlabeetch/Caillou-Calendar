@@ -5,10 +5,15 @@
   --color-primary: #d83a08;
   --color-bg-light: #FAF9F6;
   --color-surface: #FFFFFF;
+  --color-surface-alt: #F4F1EA;
   --color-ink: #1A1A1A;
   --color-bg-app: #fcffe4;
   --color-danger: #FF5722;
   --color-warning: #FFD166;
+  --color-success: #22C55E;
+  --color-muted: #5e5e5e;
+  --color-birthday: #EF476F;
+  --color-avatar: #F4A7BB;
 
   --color-mem-1: #B39DDB;
   --color-mem-2: #80CBC4;
@@ -26,10 +31,15 @@
   --color-primary: #ff5e2b;
   --color-bg-light: #2a2a2a;
   --color-surface: #1a1a1a;
+  --color-surface-alt: #232323;
   --color-ink: #faf9f6;
   --color-bg-app: #0e0e0e;
   --color-danger: #ff7043;
   --color-warning: #FFD166;
+  --color-success: #4ade80;
+  --color-muted: #a1a1a1;
+  --color-birthday: #f87171;
+  --color-avatar: #f9a8d4;
 
   --color-mem-1: #b39ddb;
   --color-mem-2: #80cbc4;
@@ -48,9 +58,15 @@
     --color-primary: #ff5e2b;
     --color-bg-light: #2a2a2a;
     --color-surface: #1a1a1a;
+    --color-surface-alt: #232323;
     --color-ink: #faf9f6;
     --color-bg-app: #0e0e0e;
     --color-danger: #ff7043;
+    --color-warning: #FFD166;
+    --color-success: #4ade80;
+    --color-muted: #a1a1a1;
+    --color-birthday: #f87171;
+    --color-avatar: #f9a8d4;
   }
 }
 
@@ -103,6 +119,23 @@ button, a, [role="button"] {
     transform: scale(1.05) translate(-2px, -2px);
     box-shadow: 6px 6px 0px var(--color-ink) !important;
     z-index: 50 !important;
+  }
+
+  /* Striped background for events assigned to multiple family members.
+     Resolves the 4 member tokens at runtime so dark mode is automatic. */
+  .pill-multi-member {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--color-mem-1) 0,
+      var(--color-mem-1) 10px,
+      var(--color-mem-2) 10px,
+      var(--color-mem-2) 20px,
+      var(--color-mem-3) 20px,
+      var(--color-mem-3) 30px,
+      var(--color-mem-4) 30px,
+      var(--color-mem-4) 40px
+    );
+    color: var(--color-ink);
   }
 }
 
