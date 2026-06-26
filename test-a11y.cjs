@@ -11,7 +11,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const ARTIFACT_DIR = path.join(__dirname, 'audit-screenshots');
 
 const SEVERITY_RANK = { minor: 0, moderate: 1, serious: 2, critical: 3 };

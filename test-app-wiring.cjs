@@ -53,7 +53,7 @@ function record(name, ok, detail) {
   });
 
   try {
-    await page.goto('http://localhost:3000', { waitUntil: 'networkidle2', timeout: 15000 });
+    await page.goto(process.env.BASE_URL || 'http://localhost:3000', { waitUntil: 'networkidle2', timeout: 15000 });
     await sleep(2000);
     record('app booted', true);
 
